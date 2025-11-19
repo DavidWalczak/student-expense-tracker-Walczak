@@ -23,9 +23,7 @@ export default function ExpenseScreen() {
   const [editingId, setEditingId] = useState(null);
 
     const loadExpenses = async () => {
-    const rows = await db.getAllAsync(
-      'SELECT * FROM expenses ORDER BY id DESC;'
-    );
+    const rows = await db.getAllAsync('SELECT * FROM expenses ORDER BY id DESC;');
     setExpenses(rows);
   };
 
@@ -52,84 +50,92 @@ export default function ExpenseScreen() {
         [amountNumber, trimmedCategory, trimmedNote || null, date || null, totalExpense || null]
     );
 
+    resetForm();
+
+    loadExpenses();
+  };
+
+  //========DELETE EXPENSE========
+
+    const deleteExpense = async (id) => {
+        await db.runAsync('DELETE FROM expenses WHERE id = ?;', [id]);
+        loadExpenses();
+    };
+
+  //========EDIT EXPENSE========
+
+  //======== START EDITING ========
+  const startEditing = (expense) => {
+    setEditingId(expense.id);
+    setAmount(String(expense.amount));
+    setCategory(expense.category);
+    setNote(expense.note || '');
+    setDate(expense.date || '');
+    setTotalExpense(expense.total ? String(expense.total) : '');
+  };
+
+  //======== SAVE EDITED EXPENSE ========
+  const editExpense = async () => {
+    if (!editingId) return;
+
+    const amountNumber = parseFloat(amount);
+    if (isNaN(amountNumber) || amountNumber <= 0) return;
+
+    const trimmedCategory = category.trim();
+    const trimmedNote = note.trim();
+
+    await db.runAsync(
+      `UPDATE expenses 
+        SET amount = ?, category = ?, note = ?, date = ?, total = ?
+        WHERE id = ?;`,
+      [
+        amountNumber,
+        trimmedCategory,
+        trimmedNote || null,
+        date || null,
+        totalExpense || null,
+        editingId,
+      ]
+    );
+
+    resetForm();
+    loadExpenses();
+  };
+
+  //======== RESET FORM ========
+  const resetForm = () => {
     setAmount('');
     setCategory('');
     setNote('');
     setDate('');
     setTotalExpense('');
-
-    loadExpenses();
+    setEditingId(null);
   };
-
-  //========Delete Expense========
-
-    const deleteExpense = async (id) => {
-    await db.runAsync('DELETE FROM expenses WHERE id = ?;', [id]);
-    loadExpenses();
-  };
-
-    const renderExpense = ({ item }) => (
+  //======== RENDER EACH EXPENSE ROW ========
+  const renderExpense = ({ item }) => (
     <View style={styles.expenseRow}>
       <View style={{ flex: 1 }}>
         <Text style={styles.expenseAmount}>${Number(item.amount).toFixed(2)}</Text>
         <Text style={styles.expenseCategory}>{item.category}</Text>
+
         {item.note ? <Text style={styles.expenseNote}>{item.note}</Text> : null}
         {item.date ? <Text style={styles.expenseNote}>Date: {item.date}</Text> : null}
         {item.total ? (
-        <Text style={styles.expenseNote}>Daily Total: ${Number(item.total).toFixed(2)}</Text>
+          <Text style={styles.expenseNote}>Daily Total: ${Number(item.total).toFixed(2)}</Text>
         ) : null}
       </View>
 
+      {/* Edit Button */}
+      <TouchableOpacity onPress={() => startEditing(item)}>
+        <Text style={styles.edit}>✎</Text>
+      </TouchableOpacity>
+
+      {/* Delete Button */}
       <TouchableOpacity onPress={() => deleteExpense(item.id)}>
         <Text style={styles.delete}>✕</Text>
       </TouchableOpacity>
     </View>
   );
-
-  //========EDIT EXPENSE========
-
-  const editExpense = async () => {
-        if (!editingId) return;
-
-        const amountNumber = parseFloat(amount);
-        if (isNaN(amountNumber) || amountNumber <= 0) return;
-
-        const trimmedCategory = category.trim();
-        const trimmedNote = note.trim();
-
-        await db.runAsync(
-            `UPDATE expenses 
-            SET amount = ?, category = ?, note = ?, date = ?, total = ?
-            WHERE id = ?;`,
-            [
-            amountNumber,
-            trimmedCategory,
-            trimmedNote || null,
-            date || null,
-            totalExpense || null,
-            editingId,
-            ]
-        );
-
-        // Reset after saving
-        setAmount('');
-        setCategory('');
-        setNote('');
-        setDate('');
-        setTotalExpense('');
-        setEditingId(null);
-
-        loadExpenses();
-    };
-
-    const startEditing = (expense) => {
-        setEditingId(expense.id);
-        setAmount(String(expense.amount));
-        setCategory(expense.category);
-        setNote(expense.note || '');
-        setDate(expense.date || '');
-        setTotalExpense(expense.total ? String(expense.total) : '');
-    };
 
   //========DATA TABLE SCHEMA CREATION========
 
