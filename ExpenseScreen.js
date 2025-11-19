@@ -187,7 +187,6 @@ export default function ExpenseScreen() {
         value={date}
         onChangeText={setDate}
         />
-
         <TextInput
         style={styles.input}
         placeholder="Total Expense for the Day (optional)"
@@ -196,10 +195,11 @@ export default function ExpenseScreen() {
         keyboardType="numeric"
         onChangeText={setTotalExpense}
         />
-
-        <TouchableOpacity onPress={() => startEditing(item)}>
-        <Text style={{ color: '#60a5fa', fontSize: 16, marginRight: 12 }}>✎</Text>
-        </TouchableOpacity>
+        {editingId ? (
+            <Button title="Save Changes" onPress={editExpense} />
+        ) : (
+            <Button title="Add Expense" onPress={addExpense} />
+        )}
       </View>
 
       <FlatList
