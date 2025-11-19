@@ -140,5 +140,63 @@ export default function ExpenseScreen() {
       </Text>
     </SafeAreaView>
   );
+};
 
-}
+  const styles = StyleSheet.create({
+  container: { flex: 1, padding: 16, backgroundColor: '#111827' },
+  heading: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 16,
+  },
+  form: {
+    marginBottom: 16,
+    gap: 8,
+  },
+  input: {
+    padding: 10,
+    backgroundColor: '#1f2937',
+    color: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  expenseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1f2937',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  expenseAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fbbf24',
+  },
+  expenseCategory: {
+    fontSize: 14,
+    color: '#e5e7eb',
+  },
+  expenseNote: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  delete: {
+    color: '#f87171',
+    fontSize: 20,
+    marginLeft: 12,
+  },
+  empty: {
+    color: '#9ca3af',
+    marginTop: 24,
+    textAlign: 'center',
+  },
+  footer: {
+    textAlign: 'center',
+    color: '#6b7280',
+    marginTop: 12,
+    fontSize: 12,
+  },
+});
