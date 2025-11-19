@@ -18,6 +18,9 @@ export default function ExpenseScreen() {
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [note, setNote] = useState('');
+  const [date, setDate] = useState('');
+  const [totalExpense, setTotalExpense] = useState('');
+  const [editingId, setEditingId] = useState(null);
 
     const loadExpenses = async () => {
     const rows = await db.getAllAsync(
@@ -45,13 +48,15 @@ export default function ExpenseScreen() {
     }
 
     await db.runAsync(
-      'INSERT INTO expenses (amount, category, note) VALUES (?, ?, ?);',
-      [amountNumber, trimmedCategory, trimmedNote || null]
+        'INSERT INTO expenses (amount, category, note, date, total) VALUES (?, ?, ?, ?, ?);',
+        [amountNumber, trimmedCategory, trimmedNote || null, date || null, totalExpense || null]
     );
 
     setAmount('');
     setCategory('');
     setNote('');
+    setDate('');
+    setTotalExpense('');
 
     loadExpenses();
   };
@@ -69,6 +74,10 @@ export default function ExpenseScreen() {
         <Text style={styles.expenseAmount}>${Number(item.amount).toFixed(2)}</Text>
         <Text style={styles.expenseCategory}>{item.category}</Text>
         {item.note ? <Text style={styles.expenseNote}>{item.note}</Text> : null}
+        {item.date ? <Text style={styles.expenseNote}>Date: {item.date}</Text> : null}
+        {item.total ? (
+        <Text style={styles.expenseNote}>Daily Total: ${Number(item.total).toFixed(2)}</Text>
+        ) : null}
       </View>
 
       <TouchableOpacity onPress={() => deleteExpense(item.id)}>
@@ -77,7 +86,52 @@ export default function ExpenseScreen() {
     </View>
   );
 
-  //========DATA TABLE LOAD========
+  //========EDIT EXPENSE========
+
+  const editExpense = async () => {
+        if (!editingId) return;
+
+        const amountNumber = parseFloat(amount);
+        if (isNaN(amountNumber) || amountNumber <= 0) return;
+
+        const trimmedCategory = category.trim();
+        const trimmedNote = note.trim();
+
+        await db.runAsync(
+            `UPDATE expenses 
+            SET amount = ?, category = ?, note = ?, date = ?, total = ?
+            WHERE id = ?;`,
+            [
+            amountNumber,
+            trimmedCategory,
+            trimmedNote || null,
+            date || null,
+            totalExpense || null,
+            editingId,
+            ]
+        );
+
+        // Reset after saving
+        setAmount('');
+        setCategory('');
+        setNote('');
+        setDate('');
+        setTotalExpense('');
+        setEditingId(null);
+
+        loadExpenses();
+    };
+
+    const startEditing = (expense) => {
+        setEditingId(expense.id);
+        setAmount(String(expense.amount));
+        setCategory(expense.category);
+        setNote(expense.note || '');
+        setDate(expense.date || '');
+        setTotalExpense(expense.total ? String(expense.total) : '');
+    };
+
+  //========DATA TABLE SCHEMA CREATION========
 
     useEffect(() => {
         async function setup() {
@@ -86,7 +140,9 @@ export default function ExpenseScreen() {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 amount REAL NOT NULL,
                 category TEXT NOT NULL,
-                note TEXT
+                note TEXT, 
+                date TEXT, 
+                total REAL
                 );`);
             await loadExpenses();
         }
@@ -124,6 +180,26 @@ export default function ExpenseScreen() {
           onChangeText={setNote}
         />
         <Button title="Add Expense" onPress={addExpense} />
+        <TextInput
+        style={styles.input}
+        placeholder="Date (YYYY-MM-DD)"
+        placeholderTextColor="#9ca3af"
+        value={date}
+        onChangeText={setDate}
+        />
+
+        <TextInput
+        style={styles.input}
+        placeholder="Total Expense for the Day (optional)"
+        placeholderTextColor="#9ca3af"
+        value={totalExpense}
+        keyboardType="numeric"
+        onChangeText={setTotalExpense}
+        />
+
+        <TouchableOpacity onPress={() => startEditing(item)}>
+        <Text style={{ color: '#60a5fa', fontSize: 16, marginRight: 12 }}>✎</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
