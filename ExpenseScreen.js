@@ -25,9 +25,13 @@ export default function ExpenseScreen() {
   const [runningTotal, setRunningTotal] = useState(0);
 
   // SORTING STATE
-  const [sortColumn, setSortColumn] = useState('id'); // default
-  const [sortOrder, setSortOrder] = useState('DESC'); // default
+  const [sortColumn, setSortColumn] = useState('id'); // confirmed sort
+  const [sortOrder, setSortOrder] = useState('DESC'); // confirmed sort
   const [sortModalVisible, setSortModalVisible] = useState(false);
+
+  // TEMPORARY SORT SELECTION IN MODAL
+  const [tempSortColumn, setTempSortColumn] = useState(sortColumn);
+  const [tempSortOrder, setTempSortOrder] = useState(sortOrder);
 
   // ------------------------------------------------------
   // EXPO SQLite ASYNC HELPERS
@@ -95,14 +99,23 @@ export default function ExpenseScreen() {
   // ADD EXPENSE
   // ------------------------------------------------------
   const addExpense = async () => {
-    if (!validateInputs()) return;
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a number greater than 0.');
+      return; // stop before hitting the DB
+    }
+    if (!category.trim()) {
+      Alert.alert('Category Required', 'Please enter a category.');
+      return;
+    }
+
     try {
       await execSqlAsync(
         'INSERT INTO expenses (amount, category, note, date) VALUES (?, ?, ?, ?);',
-        [parseFloat(amount), category.trim(), note.trim() || null, date || null]
+        [amt, category.trim(), note.trim() || null, date || null]
       );
       resetForm();
-      await loadExpenses(); // persist sort
+      await loadExpenses();
     } catch (e) {
       console.error('addExpense error:', e);
       Alert.alert('Database Error', 'Failed to add expense.');
@@ -121,17 +134,18 @@ export default function ExpenseScreen() {
   };
 
   const editExpense = async () => {
-    if (!editingId || !validateInputs()) return;
+    const amt = parseFloat(amount);
+    if (!editingId || isNaN(amt) || amt <= 0) return;
+
     try {
       await execSqlAsync(
         'UPDATE expenses SET amount=?, category=?, note=?, date=? WHERE id=?;',
-        [parseFloat(amount), category.trim(), note.trim() || null, date || null, editingId]
+        [amt, category.trim(), note.trim() || null, date || null, editingId]
       );
       resetForm();
       await loadExpenses();
     } catch (e) {
       console.error('editExpense error:', e);
-      Alert.alert('Database Error', 'Failed to edit expense.');
     }
   };
 
@@ -165,11 +179,11 @@ export default function ExpenseScreen() {
   };
 
   // ------------------------------------------------------
-  // SORT SELECTION
+  // CONFIRM SORT
   // ------------------------------------------------------
-  const applySort = async (col, order) => {
-    setSortColumn(col);
-    setSortOrder(order);
+  const confirmSort = async () => {
+    setSortColumn(tempSortColumn);
+    setSortOrder(tempSortOrder);
     setSortModalVisible(false);
     await loadExpenses();
   };
@@ -281,17 +295,40 @@ export default function ExpenseScreen() {
       {/* SORT MODAL */}
       <Modal visible={sortModalVisible} transparent animationType="slide">
         <View style={styles.modalView}>
-          <Text style={{ fontSize: 18, marginBottom: 12 }}>Sort By:</Text>
+          <Text style={{ fontSize: 18, marginBottom: 12, color: '#fff' }}>Sort By:</Text>
 
           {['amount', 'category', 'date'].map((col) => (
             <View key={col} style={{ flexDirection: 'row', marginBottom: 8 }}>
-              <Text style={{ flex: 1, textTransform: 'capitalize' }}>{col}</Text>
-              <Button title="Asc" onPress={() => applySort(col, 'ASC')} />
-              <Button title="Desc" onPress={() => applySort(col, 'DESC')} />
+              <Text style={{ flex: 1, textTransform: 'capitalize', color: '#fff' }}>{col}</Text>
+              <TouchableOpacity
+                style={[
+                  styles.sortButton,
+                  tempSortColumn === col && tempSortOrder === 'ASC' && styles.selectedSort,
+                ]}
+                onPress={() => {
+                  setTempSortColumn(col);
+                  setTempSortOrder('ASC');
+                }}
+              >
+                <Text>Asc</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.sortButton,
+                  tempSortColumn === col && tempSortOrder === 'DESC' && styles.selectedSort,
+                ]}
+                onPress={() => {
+                  setTempSortColumn(col);
+                  setTempSortOrder('DESC');
+                }}
+              >
+                <Text>Desc</Text>
+              </TouchableOpacity>
             </View>
           ))}
 
-          <Button title="Close" onPress={() => setSortModalVisible(false)} />
+          <Button title="Confirm Sort" onPress={confirmSort} />
+          <Button title="Cancel" onPress={() => setSortModalVisible(false)} />
         </View>
       </Modal>
     </SafeAreaView>
@@ -328,7 +365,6 @@ const styles = StyleSheet.create({
   edit: { color: '#60a5fa', fontSize: 20, marginLeft: 12 },
   delete: { color: '#f87171', fontSize: 20, marginLeft: 12 },
   empty: { color: '#9ca3af', marginTop: 24, textAlign: 'center' },
-  footer: { textAlign: 'center', color: '#6b7280', marginTop: 12, fontSize: 12 },
   totalDisplay: { marginTop: 16, fontSize: 20, fontWeight: '700', color: '#fbbf24', textAlign: 'center' },
   modalView: {
     marginTop: 100,
@@ -336,5 +372,15 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#1f2937',
     borderRadius: 12,
+  },
+  sortButton: {
+    padding: 6,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  selectedSort: {
+    backgroundColor: '#fbbf24',
   },
 });
