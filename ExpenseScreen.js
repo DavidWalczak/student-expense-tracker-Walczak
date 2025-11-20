@@ -67,6 +67,8 @@ export default function ExpenseScreen() {
     loadExpenses();
   };
 
+  //========TILE CREATION========
+
     const renderExpense = ({ item }) => (
     <View style={styles.expenseRow}>
       <View style={{ flex: 1 }}>
@@ -83,7 +85,7 @@ export default function ExpenseScreen() {
         <Text style={styles.delete}>✕</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => editExpense(item.id)}>
-        <Text style={styles.edit}>Edit</Text>
+        <Text style={styles.edit}>✎</Text>
       </TouchableOpacity>
     </View>
   );
@@ -181,7 +183,6 @@ export default function ExpenseScreen() {
           value={note}
           onChangeText={setNote}
         />
-        <Button title="Add Expense" onPress={addExpense} />
         <TextInput
         style={styles.input}
         placeholder="Date (YYYY-MM-DD) (Optional)"
@@ -189,10 +190,8 @@ export default function ExpenseScreen() {
         value={date}
         onChangeText={setDate}
         />
+        <Button title="Add Expense" onPress={addExpense} />
 
-        <TouchableOpacity onPress={() => startEditing(item)}>
-        <Text style={{ color: '#60a5fa', fontSize: 16, marginRight: 12 }}>✎</Text>
-        </TouchableOpacity>
       </View>
 
       <FlatList
