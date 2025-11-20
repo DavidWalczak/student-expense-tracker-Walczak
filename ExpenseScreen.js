@@ -55,7 +55,6 @@ export default function ExpenseScreen() {
     setCategory('');
     setNote('');
     setDate('');
-    setTotalExpense('');
 
     loadExpenses();
   };
@@ -84,9 +83,9 @@ export default function ExpenseScreen() {
       <TouchableOpacity onPress={() => deleteExpense(item.id)}>
         <Text style={styles.delete}>✕</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => editExpense(item.id)}>
-        <Text style={styles.edit}>✎</Text>
-      </TouchableOpacity>
+        <TouchableOpacity onPress={() => startEditing(item)}>
+        <Text style={{ color: '#60a5fa', fontSize: 16, marginRight: 12 }}>✎</Text>
+        </TouchableOpacity>
     </View>
   );
 
@@ -120,7 +119,6 @@ export default function ExpenseScreen() {
         setCategory('');
         setNote('');
         setDate('');
-        setTotalExpense('');
         setEditingId(null);
 
         loadExpenses();
@@ -132,7 +130,6 @@ export default function ExpenseScreen() {
         setCategory(expense.category);
         setNote(expense.note || '');
         setDate(expense.date || '');
-        setTotalExpense(expense.total ? String(expense.total) : '');
     };
 
   //========DATA TABLE SCHEMA CREATION========
