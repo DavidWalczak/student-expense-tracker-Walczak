@@ -20,12 +20,14 @@ export default function ExpenseScreen() {
   const [note, setNote] = useState('');
   const [date, setDate] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [runningTotal, setRunningTotal] = useState(0);
+  
 
-    const loadExpenses = async () => {
-    const rows = await db.getAllAsync(
-      'SELECT * FROM expenses ORDER BY id DESC;'
-    );
+  const loadExpenses = async () => {
+    const rows = await db.getAllAsync('SELECT * FROM expenses ORDER BY id DESC;');
+
     setExpenses(rows);
+    calculateTotal(rows);
   };
 
   //========Add Expense Function========
@@ -59,7 +61,14 @@ export default function ExpenseScreen() {
     loadExpenses();
   };
 
-  //========Delete Expense========
+  //========RUNNING TOTAL FUNCTION========
+
+  const calculateTotal = (rows) => {
+    const sum = rows.reduce((acc, item) => acc + Number(item.amount), 0);
+    setRunningTotal(sum);
+  };
+
+  //========DELETE EXPENSES========
 
     const deleteExpense = async (id) => {
     await db.runAsync('DELETE FROM expenses WHERE id = ?;', [id]);
@@ -188,7 +197,6 @@ export default function ExpenseScreen() {
         onChangeText={setDate}
         />
         <Button title="Add Expense" onPress={addExpense} />
-
       </View>
 
       <FlatList
@@ -200,6 +208,9 @@ export default function ExpenseScreen() {
         }
       />
 
+      <Text style={styles.totalDisplay}>
+        Total Spent: ${runningTotal.toFixed(2)}
+      </Text>
       <Text style={styles.footer}>
         Enter your expenses and they’ll be saved locally with SQLite.
       </Text>
@@ -263,5 +274,12 @@ export default function ExpenseScreen() {
     color: '#6b7280',
     marginTop: 12,
     fontSize: 12,
+  },
+  totalDisplay: {
+  marginTop: 16,
+  fontSize: 20,
+  fontWeight: '700',
+  color: '#fbbf24',
+  textAlign: 'center',
   },
 });
