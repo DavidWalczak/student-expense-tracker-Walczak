@@ -19,50 +19,45 @@ export default function ExpenseScreen() {
   const [category, setCategory] = useState('');
   const [note, setNote] = useState('');
   const [date, setDate] = useState('');
-  const [totalExpense, setTotalExpense] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [totalSpent, setTotalSpent] = useState(0);
 
-    const loadExpenses = async () => {
+  //======== LOAD EXPENSES ========
+  const loadExpenses = async () => {
     const rows = await db.getAllAsync('SELECT * FROM expenses ORDER BY id DESC;');
     setExpenses(rows);
+    calculateTotal(rows);
   };
 
-  //========Add Expense Function========
+  //======== CALCULATE TOTAL EXPENSES ========
+  const calculateTotal = (rows) => {
+    const sum = rows.reduce((acc, item) => acc + Number(item.amount), 0);
+    setTotalSpent(sum);
+  };
 
-    const addExpense = async () => {
+  //======== ADD EXPENSE ========
+  const addExpense = async () => {
     const amountNumber = parseFloat(amount);
-
-    if (isNaN(amountNumber) || amountNumber <= 0) {
-      // Basic validation: ignore invalid or non-positive amounts
-      return;
-    }
+    if (isNaN(amountNumber) || amountNumber <= 0) return;
 
     const trimmedCategory = category.trim();
-    const trimmedNote = note.trim();
 
-    if (!trimmedCategory) {
-      // Category is required
-      return;
-    }
+    if (!trimmedCategory) return;
 
     await db.runAsync(
-        'INSERT INTO expenses (amount, category, note, date, total) VALUES (?, ?, ?, ?, ?);',
-        [amountNumber, trimmedCategory, trimmedNote || null, date || null, totalExpense || null]
+      'INSERT INTO expenses (amount, category, note, date) VALUES (?, ?, ?, ?);',
+      [amountNumber, trimmedCategory, note.trim() || null, date || null]
     );
 
     resetForm();
-
     loadExpenses();
   };
 
-  //========DELETE EXPENSE========
-
-    const deleteExpense = async (id) => {
-        await db.runAsync('DELETE FROM expenses WHERE id = ?;', [id]);
-        loadExpenses();
-    };
-
-  //========EDIT EXPENSE========
+  //======== DELETE EXPENSE ========
+  const deleteExpense = async (id) => {
+    await db.runAsync('DELETE FROM expenses WHERE id = ?;', [id]);
+    loadExpenses();
+  };
 
   //======== START EDITING ========
   const startEditing = (expense) => {
@@ -71,29 +66,24 @@ export default function ExpenseScreen() {
     setCategory(expense.category);
     setNote(expense.note || '');
     setDate(expense.date || '');
-    setTotalExpense(expense.total ? String(expense.total) : '');
   };
 
-  //======== SAVE EDITED EXPENSE ========
+  //======== SAVE EDIT CHANGES ========
   const editExpense = async () => {
     if (!editingId) return;
 
     const amountNumber = parseFloat(amount);
     if (isNaN(amountNumber) || amountNumber <= 0) return;
 
-    const trimmedCategory = category.trim();
-    const trimmedNote = note.trim();
-
     await db.runAsync(
       `UPDATE expenses 
-        SET amount = ?, category = ?, note = ?, date = ?, total = ?
-        WHERE id = ?;`,
+       SET amount = ?, category = ?, note = ?, date = ?
+       WHERE id = ?;`,
       [
         amountNumber,
-        trimmedCategory,
-        trimmedNote || null,
+        category.trim(),
+        note.trim() || null,
         date || null,
-        totalExpense || null,
         editingId,
       ]
     );
@@ -108,21 +98,17 @@ export default function ExpenseScreen() {
     setCategory('');
     setNote('');
     setDate('');
-    setTotalExpense('');
     setEditingId(null);
   };
-  //======== RENDER EACH EXPENSE ROW ========
+
+  //======== RENDER A ROW ========
   const renderExpense = ({ item }) => (
     <View style={styles.expenseRow}>
       <View style={{ flex: 1 }}>
         <Text style={styles.expenseAmount}>${Number(item.amount).toFixed(2)}</Text>
         <Text style={styles.expenseCategory}>{item.category}</Text>
-
         {item.note ? <Text style={styles.expenseNote}>{item.note}</Text> : null}
         {item.date ? <Text style={styles.expenseNote}>Date: {item.date}</Text> : null}
-        {item.total ? (
-          <Text style={styles.expenseNote}>Daily Total: ${Number(item.total).toFixed(2)}</Text>
-        ) : null}
       </View>
 
       {/* Edit Button */}
@@ -137,28 +123,27 @@ export default function ExpenseScreen() {
     </View>
   );
 
-  //========DATA TABLE SCHEMA CREATION========
+  //======== INITIAL SETUP ========
+  useEffect(() => {
+    async function setup() {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS expenses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          amount REAL NOT NULL,
+          category TEXT NOT NULL,
+          note TEXT,
+          date TEXT,
+          total REAL
+        );
+      `);
+      await loadExpenses();
+    }
 
-    useEffect(() => {
-        async function setup() {
-            await db.execAsync(`
-                CREATE TABLE IF NOT EXISTS expenses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                amount REAL NOT NULL,
-                category TEXT NOT NULL,
-                note TEXT, 
-                date TEXT, 
-                total REAL
-                );`);
-            await loadExpenses();
-        }
+    setup();
+  }, []);
 
-        setup();
-    }, []);
-
-  //========RETURN FUNCTION========
-
-    return (
+  //======== UI ========
+  return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.heading}>Student Expense Tracker</Text>
 
@@ -171,6 +156,7 @@ export default function ExpenseScreen() {
           value={amount}
           onChangeText={setAmount}
         />
+
         <TextInput
           style={styles.input}
           placeholder="Category (Food, Books, Rent...)"
@@ -178,6 +164,7 @@ export default function ExpenseScreen() {
           value={category}
           onChangeText={setCategory}
         />
+
         <TextInput
           style={styles.input}
           placeholder="Note (optional)"
@@ -185,26 +172,19 @@ export default function ExpenseScreen() {
           value={note}
           onChangeText={setNote}
         />
-        <Button title="Add Expense" onPress={addExpense} />
+
         <TextInput
-        style={styles.input}
-        placeholder="Date (YYYY-MM-DD)"
-        placeholderTextColor="#9ca3af"
-        value={date}
-        onChangeText={setDate}
+          style={styles.input}
+          placeholder="Date (YYYY-MM-DD)"
+          placeholderTextColor="#9ca3af"
+          value={date}
+          onChangeText={setDate}
         />
-        <TextInput
-        style={styles.input}
-        placeholder="Total Expense for the Day (optional)"
-        placeholderTextColor="#9ca3af"
-        value={totalExpense}
-        keyboardType="numeric"
-        onChangeText={setTotalExpense}
-        />
+
         {editingId ? (
-            <Button title="Save Changes" onPress={editExpense} />
+          <Button title="Save Changes" onPress={editExpense} />
         ) : (
-            <Button title="Add Expense" onPress={addExpense} />
+          <Button title="Add Expense" onPress={addExpense} />
         )}
       </View>
 
@@ -212,19 +192,22 @@ export default function ExpenseScreen() {
         data={expenses}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderExpense}
-        ListEmptyComponent={
-          <Text style={styles.empty}>No expenses yet.</Text>
-        }
+        ListEmptyComponent={<Text style={styles.empty}>No expenses yet.</Text>}
       />
 
+      {/* TOTAL EXPENSE DISPLAY */}
+      <Text style={styles.totalText}>
+        Total Spent: ${totalSpent.toFixed(2)}
+      </Text>
+
       <Text style={styles.footer}>
-        Enter your expenses and they’ll be saved locally with SQLite.
+        Expenses are stored locally using SQLite.
       </Text>
     </SafeAreaView>
   );
-};
+}
 
-  const styles = StyleSheet.create({
+const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#111827' },
   heading: {
     fontSize: 24,
@@ -265,14 +248,25 @@ export default function ExpenseScreen() {
     fontSize: 12,
     color: '#9ca3af',
   },
+  edit: {
+    color: '#60a5fa',
+    fontSize: 20,
+    marginHorizontal: 12,
+  },
   delete: {
     color: '#f87171',
     fontSize: 20,
-    marginLeft: 12,
   },
   empty: {
     color: '#9ca3af',
     marginTop: 24,
+    textAlign: 'center',
+  },
+  totalText: {
+    color: '#fbbf24',
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 16,
     textAlign: 'center',
   },
   footer: {
