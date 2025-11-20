@@ -19,7 +19,6 @@ export default function ExpenseScreen() {
   const [category, setCategory] = useState('');
   const [note, setNote] = useState('');
   const [date, setDate] = useState('');
-  const [totalExpense, setTotalExpense] = useState('');
   const [editingId, setEditingId] = useState(null);
 
     const loadExpenses = async () => {
@@ -185,19 +184,10 @@ export default function ExpenseScreen() {
         <Button title="Add Expense" onPress={addExpense} />
         <TextInput
         style={styles.input}
-        placeholder="Date (YYYY-MM-DD)"
+        placeholder="Date (YYYY-MM-DD) (Optional)"
         placeholderTextColor="#9ca3af"
         value={date}
         onChangeText={setDate}
-        />
-
-        <TextInput
-        style={styles.input}
-        placeholder="Total Expense for the Day (optional)"
-        placeholderTextColor="#9ca3af"
-        value={totalExpense}
-        keyboardType="numeric"
-        onChangeText={setTotalExpense}
         />
 
         <TouchableOpacity onPress={() => startEditing(item)}>
