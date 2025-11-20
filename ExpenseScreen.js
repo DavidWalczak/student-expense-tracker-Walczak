@@ -30,7 +30,7 @@ export default function ExpenseScreen() {
     calculateTotal(rows);
   };
 
-  //========Add Expense Function========
+  //========ADD EXPENSE FUNCTION========
 
     const addExpense = async () => {
     const amountNumber = parseFloat(amount);
@@ -49,8 +49,8 @@ export default function ExpenseScreen() {
     }
 
     await db.runAsync(
-        'INSERT INTO expenses (amount, category, note, date, total) VALUES (?, ?, ?, ?, ?);',
-        [amountNumber, trimmedCategory, trimmedNote || null, date || null, totalExpense || null]
+        'INSERT INTO expenses (amount, category, note, date) VALUES (?, ?, ?, ?);',
+        [amountNumber, trimmedCategory, trimmedNote || null, date || null]
     );
 
     setAmount('');
@@ -92,46 +92,46 @@ export default function ExpenseScreen() {
       <TouchableOpacity onPress={() => deleteExpense(item.id)}>
         <Text style={styles.delete}>✕</Text>
       </TouchableOpacity>
-        <TouchableOpacity onPress={() => startEditing(item)}>
+      <TouchableOpacity onPress={() => startEditing(item)}>
         <Text style={{ color: '#60a5fa', fontSize: 16, marginRight: 12 }}>✎</Text>
-        </TouchableOpacity>
+      </TouchableOpacity>
     </View>
   );
 
   //========EDIT EXPENSE========
 
   const editExpense = async () => {
-        if (!editingId) return;
+  if (!editingId) return;
 
-        const amountNumber = parseFloat(amount);
-        if (isNaN(amountNumber) || amountNumber <= 0) return;
+  const amountNumber = parseFloat(amount);
+  if (isNaN(amountNumber) || amountNumber <= 0) return;
 
-        const trimmedCategory = category.trim();
-        const trimmedNote = note.trim();
+  const trimmedCategory = category.trim();
+  const trimmedNote = note.trim();
 
-        await db.runAsync(
-            `UPDATE expenses 
-            SET amount = ?, category = ?, note = ?, date = ?, total = ?
-            WHERE id = ?;`,
-            [
-            amountNumber,
-            trimmedCategory,
-            trimmedNote || null,
-            date || null,
-            totalExpense || null,
-            editingId,
-            ]
-        );
+  await db.runAsync(
+    `UPDATE expenses 
+     SET amount = ?, category = ?, note = ?, date = ?
+     WHERE id = ?;`,
+    [
+      amountNumber,
+      trimmedCategory,
+      trimmedNote || null,
+      date || null,
+      editingId,
+    ]
+  );
 
-        // Reset after saving
-        setAmount('');
-        setCategory('');
-        setNote('');
-        setDate('');
-        setEditingId(null);
+    // Reset form
+    setAmount('');
+    setCategory('');
+    setNote('');
+    setDate('');
+    setEditingId(null);
 
-        loadExpenses();
-    };
+    // Reload expenses and update totals
+    await loadExpenses();
+  };
 
     const startEditing = (expense) => {
         setEditingId(expense.id);
@@ -151,8 +151,7 @@ export default function ExpenseScreen() {
                 amount REAL NOT NULL,
                 category TEXT NOT NULL,
                 note TEXT, 
-                date TEXT, 
-                total REAL
+                date TEXT
                 );`);
             await loadExpenses();
         }
@@ -196,7 +195,10 @@ export default function ExpenseScreen() {
         value={date}
         onChangeText={setDate}
         />
-        <Button title="Add Expense" onPress={addExpense} />
+        <Button
+            title={editingId ? "Save Changes" : "Add Expense"}
+            onPress={editingId ? editExpense : addExpense}
+        />
       </View>
 
       <FlatList
