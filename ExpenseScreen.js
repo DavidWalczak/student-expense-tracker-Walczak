@@ -1,6 +1,5 @@
 // ExpenseScreen.js
 import React, { useEffect, useState } from "react";
-import { Modal } from 'react-native';
 import {
   SafeAreaView,
   View,
@@ -10,79 +9,101 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  Modal,
   Alert,
 } from "react-native";
-import * as SQLite from "expo-sqlite";
+import { useSQLiteContext } from "expo-sqlite";
+import dayjs from "dayjs";
+import isoWeek from "dayjs/plugin/isoWeek";
 
-// Global database instance
-let db;
+dayjs.extend(isoWeek);
 
 export default function ExpenseScreen() {
+  const db = useSQLiteContext();
+
   const [expenses, setExpenses] = useState([]);
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState("");
   const [editingId, setEditingId] = useState(null);
-  const [runningTotal, setRunningTotal] = useState(0);
+  const [filter, setFilter] = useState("All");
   const [sortField, setSortField] = useState("date");
   const [sortDirection, setSortDirection] = useState("DESC");
   const [dropdownVisible, setDropdownVisible] = useState(false);
 
-  // Open DB asynchronously once
-  const initDB = async () => {
-    db = await SQLite.openDatabaseAsync("expenses.db");
+  // Setup table on first render
+  useEffect(() => {
+    async function setup() {
+      try {
+        await db.execAsync(`
+          CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            amount REAL NOT NULL,
+            category TEXT NOT NULL,
+            note TEXT,
+            date TEXT
+          );
+        `);
+        await loadExpenses();
+      } catch (e) {
+        console.error("DB setup error:", e);
+      }
+    }
+    setup();
+  }, []);
 
-    await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS expenses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        amount REAL NOT NULL,
-        category TEXT NOT NULL,
-        note TEXT,
-        date TEXT
-      );
-    `);
-  };
+  // Reload expenses when filter or sorting changes
+  useEffect(() => {
+    loadExpenses();
+  }, [filter, sortField, sortDirection]);
 
   const loadExpenses = async () => {
     try {
-        const result = await db.getAllAsync("SELECT * FROM expenses;");
-        let rows = result;
+      const rows = (await db.getAllAsync("SELECT * FROM expenses;")) || [];
 
-        // sort logic
-      rows.sort((a, b) => {
-            let x = a[sortField];
-            let y = b[sortField];
+      // Apply date filter
+      const filtered = rows.filter((exp) => {
+        if (!exp.date) return true;
+        const expDate = dayjs(exp.date);
+        const today = dayjs();
 
-        // convert amount to number before sorting
-        if (sortField === "amount") {
-            x = parseFloat(x);
-            y = parseFloat(y);
+        if (filter === "This Week") {
+          return (
+            expDate.isoWeek() === today.isoWeek() &&
+            expDate.year() === today.year()
+          );
+        } else if (filter === "This Month") {
+          return (
+            expDate.month() === today.month() && expDate.year() === today.year()
+          );
         }
-
-        // convert date to comparable
-        if (sortField === "date") {
-            x = x || "";
-            y = y || "";
-        }
-
-        if (sortDirection === "ASC") {
-            return x > y ? 1 : -1;
-        } else {
-            return x < y ? 1 : -1;
-        }
+        return true;
       });
 
-        setExpenses(rows);
+      // Apply sorting
+      filtered.sort((a, b) => {
+        let x = a[sortField];
+        let y = b[sortField];
 
-        const sum = rows.reduce((acc, item) => acc + (parseFloat(item.amount) || 0), 0);
-        setRunningTotal(sum);
+        if (sortField === "amount") {
+          x = parseFloat(x);
+          y = parseFloat(y);
+        }
+        if (sortField === "date") {
+          x = x || "";
+          y = y || "";
+        }
+
+        return sortDirection === "ASC" ? (x > y ? 1 : -1) : x < y ? 1 : -1;
+      });
+
+      setExpenses(filtered);
     } catch (e) {
-        console.error("loadExpenses error:", e);
+      console.error("loadExpenses error:", e);
     }
   };
 
-  // Input validation
   const validateInputs = () => {
     const amountNumber = parseFloat(amount);
     if (isNaN(amountNumber) || amountNumber <= 0) {
@@ -100,18 +121,28 @@ export default function ExpenseScreen() {
     return true;
   };
 
-  // Add new expense
+  const resetForm = () => {
+    setAmount("");
+    setCategory("");
+    setNote("");
+    setDate("");
+    setEditingId(null);
+  };
+
   const addExpense = async () => {
     if (!validateInputs()) return;
 
     const amountNumber = parseFloat(amount);
-
     try {
       await db.runAsync(
         "INSERT INTO expenses (amount, category, note, date) VALUES (?, ?, ?, ?)",
-        [amountNumber, category.trim(), note.trim() || null, date || null]
+        [
+          amountNumber,
+          category.trim(),
+          note.trim() || null,
+          date || dayjs().format("YYYY-MM-DD"),
+        ]
       );
-
       resetForm();
       loadExpenses();
     } catch (e) {
@@ -128,10 +159,8 @@ export default function ExpenseScreen() {
     setDate(expense.date || "");
   };
 
-  // Save edit
   const editExpense = async () => {
     if (!validateInputs()) return;
-
     const amountNumber = parseFloat(amount);
 
     try {
@@ -143,11 +172,10 @@ export default function ExpenseScreen() {
           amountNumber,
           category.trim(),
           note.trim() || null,
-          date || null,
+          date || dayjs().format("YYYY-MM-DD"),
           editingId,
         ]
       );
-
       resetForm();
       loadExpenses();
     } catch (e) {
@@ -156,7 +184,6 @@ export default function ExpenseScreen() {
     }
   };
 
-  // Delete with confirmation
   const deleteExpense = (id) => {
     Alert.alert("Delete Entry", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
@@ -176,14 +203,6 @@ export default function ExpenseScreen() {
     ]);
   };
 
-  const resetForm = () => {
-    setAmount("");
-    setCategory("");
-    setNote("");
-    setDate("");
-    setEditingId(null);
-  };
-
   const renderExpense = ({ item }) => (
     <View style={styles.expenseRow}>
       <View style={{ flex: 1 }}>
@@ -192,9 +211,7 @@ export default function ExpenseScreen() {
         </Text>
         <Text style={styles.expenseCategory}>{item.category}</Text>
         {item.note ? <Text style={styles.expenseNote}>{item.note}</Text> : null}
-        {item.date ? (
-          <Text style={styles.expenseNote}>Date: {item.date}</Text>
-        ) : null}
+        {item.date ? <Text style={styles.expenseNote}>Date: {item.date}</Text> : null}
       </View>
 
       <TouchableOpacity onPress={() => startEditing(item)}>
@@ -206,15 +223,6 @@ export default function ExpenseScreen() {
       </TouchableOpacity>
     </View>
   );
-
-
-  // Run DB setup once
-  useEffect(() => {
-    (async () => {
-      await initDB();
-      await loadExpenses();
-    })();
-  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -256,93 +264,86 @@ export default function ExpenseScreen() {
           onPress={editingId ? editExpense : addExpense}
         />
       </View>
+
+      {/* Filters */}
+      <View style={{ flexDirection: "row", justifyContent: "space-around", marginVertical: 12 }}>
+        {["All", "This Week", "This Month"].map((f) => (
+          <TouchableOpacity
+            key={f}
+            onPress={() => setFilter(f)}
+            style={[
+              styles.filterButton,
+              filter === f && styles.filterActive,
+            ]}
+          >
+            <Text style={{ color: "#fff" }}>{f}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Sort Dropdown */}
       <View style={{ marginBottom: 12 }}>
-  <TouchableOpacity
-    style={styles.dropdownButton}
-    onPress={() => setDropdownVisible(true)}
-  >
-    <Text style={{ color: "#fff" }}>
-      Sort by: {sortField} ({sortDirection})
-    </Text>
-  </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.dropdownButton}
+          onPress={() => setDropdownVisible(true)}
+        >
+          <Text style={{ color: "#fff" }}>
+            Sort by: {sortField} ({sortDirection})
+          </Text>
+        </TouchableOpacity>
 
-    {/* Dropdown modal */}
-    <Modal
-      transparent
-      visible={dropdownVisible}
-      animationType="fade"
-    >
-      <TouchableOpacity
-        style={styles.dropdownOverlay}
-        onPress={() => setDropdownVisible(false)}
-      >
-        <View style={styles.dropdownMenu}>
+        <Modal transparent visible={dropdownVisible} animationType="fade">
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            onPress={() => setDropdownVisible(false)}
+          >
+            <View style={styles.dropdownMenu}>
+              {["date", "amount", "category"].map((field) => (
+                <TouchableOpacity
+                  key={field}
+                  style={styles.dropdownOption}
+                  onPress={() => {
+                    setSortField(field);
+                    setDropdownVisible(false);
+                  }}
+                >
+                  <Text style={styles.dropdownText}>{field}</Text>
+                </TouchableOpacity>
+              ))}
 
-          {/* Sort field options */}
-          {["date", "amount", "category"].map((field) => (
-            <TouchableOpacity
-              key={field}
-              style={styles.dropdownOption}
-              onPress={() => {
-                setSortField(field);
-                setDropdownVisible(false);
-                loadExpenses();
-              }}
-            >
-              <Text style={styles.dropdownText}>{field}</Text>
-            </TouchableOpacity>
-          ))}
+              <View style={{ height: 1, backgroundColor: "#555", marginVertical: 8 }} />
 
-          <View style={{ height: 1, backgroundColor: "#555", marginVertical: 8 }} />
+              {["ASC", "DESC"].map((dir) => (
+                <TouchableOpacity
+                  key={dir}
+                  style={styles.dropdownOption}
+                  onPress={() => {
+                    setSortDirection(dir);
+                    setDropdownVisible(false);
+                  }}
+                >
+                  <Text style={styles.dropdownText}>{dir}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      </View>
 
-          {/* Sort direction */}
-          {["ASC", "DESC"].map((dir) => (
-            <TouchableOpacity
-              key={dir}
-              style={styles.dropdownOption}
-              onPress={() => {
-                setSortDirection(dir);
-                setDropdownVisible(false);
-                loadExpenses();
-              }}
-            >
-              <Text style={styles.dropdownText}>{dir}</Text>
-            </TouchableOpacity>
-          ))}
-
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  </View>
       <FlatList
         data={expenses}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderExpense}
-        ListEmptyComponent={
-          <Text style={styles.empty}>No expenses yet.</Text>
-        }
+        ListEmptyComponent={<Text style={styles.empty}>No expenses yet.</Text>}
       />
-
-      <Text style={styles.totalDisplay}>
-        Total Spent: ${runningTotal.toFixed(2)}
-      </Text>
-      <Text style={styles.footer}>Expenses are saved locally with SQLite.</Text>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#111827" },
-  heading: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#fff",
-    marginBottom: 16,
-  },
-  form: {
-    marginBottom: 16,
-    gap: 8,
-  },
+  heading: { fontSize: 24, fontWeight: "700", color: "#fff", marginBottom: 16 },
+  form: { marginBottom: 16, gap: 8 },
   input: {
     padding: 10,
     backgroundColor: "#1f2937",
@@ -360,62 +361,31 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
   },
-  expenseAmount: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#fbbf24",
+  expenseAmount: { fontSize: 18, fontWeight: "700", color: "#fbbf24" },
+  expenseCategory: { fontSize: 14, color: "#e5e7eb" },
+  expenseNote: { fontSize: 12, color: "#9ca3af" },
+  edit: { color: "#60a5fa", fontSize: 20, marginLeft: 12 },
+  delete: { color: "#f87171", fontSize: 20, marginLeft: 12 },
+  empty: { color: "#9ca3af", marginTop: 24, textAlign: "center" },
+  filterButton: {
+    padding: 8,
+    backgroundColor: "#374151",
+    borderRadius: 8,
   },
-  expenseCategory: {
-    fontSize: 14,
-    color: "#e5e7eb",
-  },
-  expenseNote: {
-    fontSize: 12,
-    color: "#9ca3af",
-  },
-  edit: {
-    color: "#60a5fa",
-    fontSize: 20,
-    marginLeft: 12,
-  },
-  delete: {
-    color: "#f87171",
-    fontSize: 20,
-    marginLeft: 12,
-  },
-  empty: {
-    color: "#9ca3af",
-    marginTop: 24,
-    textAlign: "center",
-  },
-  footer: {
-    textAlign: "center",
-    color: "#6b7280",
-    marginTop: 12,
-    fontSize: 12,
-  },
-  totalDisplay: {
-    marginTop: 16,
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#fbbf24",
-    textAlign: "center",
-  },
+  filterActive: { backgroundColor: "#60a5fa" },
   dropdownButton: {
-  padding: 10,
-  backgroundColor: "#1f2937",
-  borderRadius: 8,
-  borderWidth: 1,
-  borderColor: "#374151",
+    padding: 10,
+    backgroundColor: "#1f2937",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#374151",
   },
-
   dropdownOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.5)",
   },
-
   dropdownMenu: {
     width: 200,
     backgroundColor: "#1f2937",
@@ -424,13 +394,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#374151",
   },
-
-  dropdownOption: {
-    padding: 10,
-  },
-
-  dropdownText: {
-    color: "#fff",
-    fontSize: 16,
-  },
+  dropdownOption: { padding: 10 },
+  dropdownText: { color: "#fff", fontSize: 16 },
 });
