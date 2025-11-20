@@ -1,5 +1,6 @@
 // ExpenseScreen.js
 import React, { useEffect, useState } from "react";
+import { Modal } from 'react-native';
 import {
   SafeAreaView,
   View,
@@ -24,6 +25,9 @@ export default function ExpenseScreen() {
   const [date, setDate] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [runningTotal, setRunningTotal] = useState(0);
+  const [sortField, setSortField] = useState("date");
+  const [sortDirection, setSortDirection] = useState("DESC");
+  const [dropdownVisible, setDropdownVisible] = useState(false);
 
   // Open DB asynchronously once
   const initDB = async () => {
@@ -40,22 +44,41 @@ export default function ExpenseScreen() {
     `);
   };
 
-  // Load all expenses
   const loadExpenses = async () => {
     try {
-      const rows = await db.getAllAsync(
-        "SELECT * FROM expenses ORDER BY id DESC;"
-      );
+        const result = await db.getAllAsync("SELECT * FROM expenses;");
+        let rows = result;
 
-      setExpenses(rows);
+        // sort logic
+      rows.sort((a, b) => {
+            let x = a[sortField];
+            let y = b[sortField];
 
-      const total = rows.reduce(
-        (acc, row) => acc + (parseFloat(row.amount) || 0),
-        0
-      );
-      setRunningTotal(total);
+        // convert amount to number before sorting
+        if (sortField === "amount") {
+            x = parseFloat(x);
+            y = parseFloat(y);
+        }
+
+        // convert date to comparable
+        if (sortField === "date") {
+            x = x || "";
+            y = y || "";
+        }
+
+        if (sortDirection === "ASC") {
+            return x > y ? 1 : -1;
+        } else {
+            return x < y ? 1 : -1;
+        }
+      });
+
+        setExpenses(rows);
+
+        const sum = rows.reduce((acc, item) => acc + (parseFloat(item.amount) || 0), 0);
+        setRunningTotal(sum);
     } catch (e) {
-      console.error("loadExpenses error:", e);
+        console.error("loadExpenses error:", e);
     }
   };
 
@@ -233,7 +256,64 @@ export default function ExpenseScreen() {
           onPress={editingId ? editExpense : addExpense}
         />
       </View>
+      <View style={{ marginBottom: 12 }}>
+  <TouchableOpacity
+    style={styles.dropdownButton}
+    onPress={() => setDropdownVisible(true)}
+  >
+    <Text style={{ color: "#fff" }}>
+      Sort by: {sortField} ({sortDirection})
+    </Text>
+  </TouchableOpacity>
 
+    {/* Dropdown modal */}
+    <Modal
+      transparent
+      visible={dropdownVisible}
+      animationType="fade"
+    >
+      <TouchableOpacity
+        style={styles.dropdownOverlay}
+        onPress={() => setDropdownVisible(false)}
+      >
+        <View style={styles.dropdownMenu}>
+
+          {/* Sort field options */}
+          {["date", "amount", "category"].map((field) => (
+            <TouchableOpacity
+              key={field}
+              style={styles.dropdownOption}
+              onPress={() => {
+                setSortField(field);
+                setDropdownVisible(false);
+                loadExpenses();
+              }}
+            >
+              <Text style={styles.dropdownText}>{field}</Text>
+            </TouchableOpacity>
+          ))}
+
+          <View style={{ height: 1, backgroundColor: "#555", marginVertical: 8 }} />
+
+          {/* Sort direction */}
+          {["ASC", "DESC"].map((dir) => (
+            <TouchableOpacity
+              key={dir}
+              style={styles.dropdownOption}
+              onPress={() => {
+                setSortDirection(dir);
+                setDropdownVisible(false);
+                loadExpenses();
+              }}
+            >
+              <Text style={styles.dropdownText}>{dir}</Text>
+            </TouchableOpacity>
+          ))}
+
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  </View>
       <FlatList
         data={expenses}
         keyExtractor={(item) => item.id.toString()}
@@ -320,5 +400,37 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#fbbf24",
     textAlign: "center",
+  },
+  dropdownButton: {
+  padding: 10,
+  backgroundColor: "#1f2937",
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: "#374151",
+  },
+
+  dropdownOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+
+  dropdownMenu: {
+    width: 200,
+    backgroundColor: "#1f2937",
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#374151",
+  },
+
+  dropdownOption: {
+    padding: 10,
+  },
+
+  dropdownText: {
+    color: "#fff",
+    fontSize: 16,
   },
 });
