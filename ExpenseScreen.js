@@ -31,6 +31,7 @@ export default function ExpenseScreen() {
   const [sortField, setSortField] = useState("date");
   const [sortDirection, setSortDirection] = useState("DESC");
   const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [runningTotal, setRunningTotal] = useState(0);
 
   // Setup table on first render
   useEffect(() => {
@@ -99,6 +100,13 @@ export default function ExpenseScreen() {
       });
 
       setExpenses(filtered);
+
+      // Calculate running total
+      const total = filtered.reduce(
+        (sum, exp) => sum + parseFloat(exp.amount),
+        0
+      );
+      setRunningTotal(total);
     } catch (e) {
       console.error("loadExpenses error:", e);
     }
@@ -336,6 +344,11 @@ export default function ExpenseScreen() {
         renderItem={renderExpense}
         ListEmptyComponent={<Text style={styles.empty}>No expenses yet.</Text>}
       />
+
+      {/* Running Total */}
+      <Text style={styles.totalDisplay}>
+        Total: ${runningTotal.toFixed(2)}
+      </Text>
     </SafeAreaView>
   );
 }
@@ -396,4 +409,11 @@ const styles = StyleSheet.create({
   },
   dropdownOption: { padding: 10 },
   dropdownText: { color: "#fff", fontSize: 16 },
+  totalDisplay: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#fbbf24",
+    textAlign: "center",
+    marginVertical: 12,
+  },
 });
