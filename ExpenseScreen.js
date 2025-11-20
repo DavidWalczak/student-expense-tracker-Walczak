@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+// ExpenseScreen.js
+import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -8,160 +9,191 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-} from 'react-native';
-import { useSQLiteContext } from 'expo-sqlite';
+  Alert,
+} from "react-native";
+import * as SQLite from "expo-sqlite";
+
+// Global database instance
+let db;
 
 export default function ExpenseScreen() {
-  const db = useSQLiteContext();
-
   const [expenses, setExpenses] = useState([]);
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('');
-  const [note, setNote] = useState('');
-  const [date, setDate] = useState('');
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("");
+  const [note, setNote] = useState("");
+  const [date, setDate] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [runningTotal, setRunningTotal] = useState(0);
-  
 
-  const loadExpenses = async () => {
-    const rows = await db.getAllAsync('SELECT * FROM expenses ORDER BY id DESC;');
+  // Open DB asynchronously once
+  const initDB = async () => {
+    db = await SQLite.openDatabaseAsync("expenses.db");
 
-    setExpenses(rows);
-    calculateTotal(rows);
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        amount REAL NOT NULL,
+        category TEXT NOT NULL,
+        note TEXT,
+        date TEXT
+      );
+    `);
   };
 
-  //========ADD EXPENSE FUNCTION========
+  // Load all expenses
+  const loadExpenses = async () => {
+    try {
+      const rows = await db.getAllAsync(
+        "SELECT * FROM expenses ORDER BY id DESC;"
+      );
 
-    const addExpense = async () => {
+      setExpenses(rows);
+
+      const total = rows.reduce(
+        (acc, row) => acc + (parseFloat(row.amount) || 0),
+        0
+      );
+      setRunningTotal(total);
+    } catch (e) {
+      console.error("loadExpenses error:", e);
+    }
+  };
+
+  // Input validation
+  const validateInputs = () => {
+    const amountNumber = parseFloat(amount);
+    if (isNaN(amountNumber) || amountNumber <= 0) {
+      Alert.alert("Invalid Amount", "Please enter a valid number > 0.");
+      return false;
+    }
+    if (!category.trim()) {
+      Alert.alert("Category Required", "Please enter a category.");
+      return false;
+    }
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      Alert.alert("Invalid Date", "Use YYYY-MM-DD format.");
+      return false;
+    }
+    return true;
+  };
+
+  // Add new expense
+  const addExpense = async () => {
+    if (!validateInputs()) return;
+
     const amountNumber = parseFloat(amount);
 
-    if (isNaN(amountNumber) || amountNumber <= 0) {
-      // Basic validation: ignore invalid or non-positive amounts
-      return;
+    try {
+      await db.runAsync(
+        "INSERT INTO expenses (amount, category, note, date) VALUES (?, ?, ?, ?)",
+        [amountNumber, category.trim(), note.trim() || null, date || null]
+      );
+
+      resetForm();
+      loadExpenses();
+    } catch (e) {
+      console.error("addExpense error:", e);
+      Alert.alert("Database Error", "Could not add expense.");
     }
+  };
 
-    const trimmedCategory = category.trim();
-    const trimmedNote = note.trim();
+  const startEditing = (expense) => {
+    setEditingId(expense.id);
+    setAmount(String(expense.amount));
+    setCategory(expense.category);
+    setNote(expense.note || "");
+    setDate(expense.date || "");
+  };
 
-    if (!trimmedCategory) {
-      // Category is required
-      return;
+  // Save edit
+  const editExpense = async () => {
+    if (!validateInputs()) return;
+
+    const amountNumber = parseFloat(amount);
+
+    try {
+      await db.runAsync(
+        `UPDATE expenses
+         SET amount=?, category=?, note=?, date=?
+         WHERE id=?`,
+        [
+          amountNumber,
+          category.trim(),
+          note.trim() || null,
+          date || null,
+          editingId,
+        ]
+      );
+
+      resetForm();
+      loadExpenses();
+    } catch (e) {
+      console.error("editExpense error:", e);
+      Alert.alert("Database Error", "Could not update expense.");
     }
-
-    await db.runAsync(
-        'INSERT INTO expenses (amount, category, note, date) VALUES (?, ?, ?, ?);',
-        [amountNumber, trimmedCategory, trimmedNote || null, date || null]
-    );
-
-    setAmount('');
-    setCategory('');
-    setNote('');
-    setDate('');
-
-    loadExpenses();
   };
 
-  //========RUNNING TOTAL FUNCTION========
-
-  const calculateTotal = (rows) => {
-    const sum = rows.reduce((acc, item) => acc + Number(item.amount), 0);
-    setRunningTotal(sum);
+  // Delete with confirmation
+  const deleteExpense = (id) => {
+    Alert.alert("Delete Entry", "Are you sure?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await db.runAsync("DELETE FROM expenses WHERE id=?", [id]);
+            loadExpenses();
+          } catch (e) {
+            console.error("deleteExpense error:", e);
+            Alert.alert("Database Error", "Could not delete expense.");
+          }
+        },
+      },
+    ]);
   };
 
-  //========DELETE EXPENSES========
-
-    const deleteExpense = async (id) => {
-    await db.runAsync('DELETE FROM expenses WHERE id = ?;', [id]);
-    loadExpenses();
+  const resetForm = () => {
+    setAmount("");
+    setCategory("");
+    setNote("");
+    setDate("");
+    setEditingId(null);
   };
 
-  //========TILE CREATION========
-
-    const renderExpense = ({ item }) => (
+  const renderExpense = ({ item }) => (
     <View style={styles.expenseRow}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.expenseAmount}>${Number(item.amount).toFixed(2)}</Text>
+        <Text style={styles.expenseAmount}>
+          ${Number(item.amount).toFixed(2)}
+        </Text>
         <Text style={styles.expenseCategory}>{item.category}</Text>
         {item.note ? <Text style={styles.expenseNote}>{item.note}</Text> : null}
-        {item.date ? <Text style={styles.expenseNote}>Date: {item.date}</Text> : null}
-        {item.total ? (
-        <Text style={styles.expenseNote}>Daily Total: ${Number(item.total).toFixed(2)}</Text>
+        {item.date ? (
+          <Text style={styles.expenseNote}>Date: {item.date}</Text>
         ) : null}
       </View>
+
+      <TouchableOpacity onPress={() => startEditing(item)}>
+        <Text style={styles.edit}>✎</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity onPress={() => deleteExpense(item.id)}>
         <Text style={styles.delete}>✕</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => startEditing(item)}>
-        <Text style={{ color: '#60a5fa', fontSize: 16, marginRight: 12 }}>✎</Text>
-      </TouchableOpacity>
     </View>
   );
 
-  //========EDIT EXPENSE========
 
-  const editExpense = async () => {
-  if (!editingId) return;
+  // Run DB setup once
+  useEffect(() => {
+    (async () => {
+      await initDB();
+      await loadExpenses();
+    })();
+  }, []);
 
-  const amountNumber = parseFloat(amount);
-  if (isNaN(amountNumber) || amountNumber <= 0) return;
-
-  const trimmedCategory = category.trim();
-  const trimmedNote = note.trim();
-
-  await db.runAsync(
-    `UPDATE expenses 
-     SET amount = ?, category = ?, note = ?, date = ?
-     WHERE id = ?;`,
-    [
-      amountNumber,
-      trimmedCategory,
-      trimmedNote || null,
-      date || null,
-      editingId,
-    ]
-  );
-
-    // Reset form
-    setAmount('');
-    setCategory('');
-    setNote('');
-    setDate('');
-    setEditingId(null);
-
-    // Reload expenses and update totals
-    await loadExpenses();
-  };
-
-    const startEditing = (expense) => {
-        setEditingId(expense.id);
-        setAmount(String(expense.amount));
-        setCategory(expense.category);
-        setNote(expense.note || '');
-        setDate(expense.date || '');
-    };
-
-  //========DATA TABLE SCHEMA CREATION========
-
-    useEffect(() => {
-        async function setup() {
-            await db.execAsync(`
-                CREATE TABLE IF NOT EXISTS expenses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                amount REAL NOT NULL,
-                category TEXT NOT NULL,
-                note TEXT, 
-                date TEXT
-                );`);
-            await loadExpenses();
-        }
-
-        setup();
-    }, []);
-
-  //========RETURN FUNCTION========
-
-    return (
+  return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.heading}>Student Expense Tracker</Text>
 
@@ -189,15 +221,16 @@ export default function ExpenseScreen() {
           onChangeText={setNote}
         />
         <TextInput
-        style={styles.input}
-        placeholder="Date (YYYY-MM-DD) (Optional)"
-        placeholderTextColor="#9ca3af"
-        value={date}
-        onChangeText={setDate}
+          style={styles.input}
+          placeholder="Date (YYYY-MM-DD)"
+          placeholderTextColor="#9ca3af"
+          value={date}
+          onChangeText={setDate}
         />
+
         <Button
-            title={editingId ? "Save Changes" : "Add Expense"}
-            onPress={editingId ? editExpense : addExpense}
+          title={editingId ? "Save Changes" : "Add Expense"}
+          onPress={editingId ? editExpense : addExpense}
         />
       </View>
 
@@ -213,19 +246,17 @@ export default function ExpenseScreen() {
       <Text style={styles.totalDisplay}>
         Total Spent: ${runningTotal.toFixed(2)}
       </Text>
-      <Text style={styles.footer}>
-        Enter your expenses and they’ll be saved locally with SQLite.
-      </Text>
+      <Text style={styles.footer}>Expenses are saved locally with SQLite.</Text>
     </SafeAreaView>
   );
-};
+}
 
-  const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#111827' },
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 16, backgroundColor: "#111827" },
   heading: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#fff',
+    fontWeight: "700",
+    color: "#fff",
     marginBottom: 16,
   },
   form: {
@@ -234,54 +265,60 @@ export default function ExpenseScreen() {
   },
   input: {
     padding: 10,
-    backgroundColor: '#1f2937',
-    color: '#fff',
+    backgroundColor: "#1f2937",
+    color: "#fff",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: "#374151",
+    marginBottom: 8,
   },
   expenseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1f2937',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1f2937",
     padding: 12,
     borderRadius: 8,
     marginBottom: 8,
   },
   expenseAmount: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#fbbf24',
+    fontWeight: "700",
+    color: "#fbbf24",
   },
   expenseCategory: {
     fontSize: 14,
-    color: '#e5e7eb',
+    color: "#e5e7eb",
   },
   expenseNote: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: "#9ca3af",
+  },
+  edit: {
+    color: "#60a5fa",
+    fontSize: 20,
+    marginLeft: 12,
   },
   delete: {
-    color: '#f87171',
+    color: "#f87171",
     fontSize: 20,
     marginLeft: 12,
   },
   empty: {
-    color: '#9ca3af',
+    color: "#9ca3af",
     marginTop: 24,
-    textAlign: 'center',
+    textAlign: "center",
   },
   footer: {
-    textAlign: 'center',
-    color: '#6b7280',
+    textAlign: "center",
+    color: "#6b7280",
     marginTop: 12,
     fontSize: 12,
   },
   totalDisplay: {
-  marginTop: 16,
-  fontSize: 20,
-  fontWeight: '700',
-  color: '#fbbf24',
-  textAlign: 'center',
+    marginTop: 16,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#fbbf24",
+    textAlign: "center",
   },
 });
