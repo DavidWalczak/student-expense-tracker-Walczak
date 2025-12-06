@@ -46,13 +46,11 @@ export default function ExpenseScreen() {
   const [activeScreen, setActiveScreen] = useState("expenses"); // 'expenses' | 'charts'
 
   // Chart-specific state
-  // NOTE: chartSelected is a Set of lowercase category keys
   const [chartMultiselectModalVisible, setChartMultiselectModalVisible] = useState(false);
   const [chartSelectedCategories, setChartSelectedCategories] = useState(new Set());
   const [chartShowAllToggle, setChartShowAllToggle] = useState(true); // helper for UI select all / none
-
-  // Chart display window
-  const [chartDaysWindow, setChartDaysWindow] = useState(30); // show up to last 30 days by default
+  const [chartDaysWindow, setChartDaysWindow] = useState(30); // default chart window
+  const [timeDropdownVisible, setTimeDropdownVisible] = useState(false); // for time range selector
 
   // ---------- Database setup & loading ----------
   useEffect(() => {
@@ -82,7 +80,6 @@ export default function ExpenseScreen() {
   // Reset chart filters when leaving chart screen
   useEffect(() => {
     if (activeScreen !== "charts") {
-      // reset chart selections
       setChartSelectedCategories(new Set());
       setChartShowAllToggle(true);
       setChartMultiselectModalVisible(false);
@@ -262,7 +259,6 @@ export default function ExpenseScreen() {
   );
 
   // ---------- Chart helpers ----------
-  // categories extracted from current DB expenses (preserve original capitalization by taking first-seen)
   const categories = useMemo(() => {
     const seen = new Map();
     expenses.forEach((e) => {
@@ -274,13 +270,11 @@ export default function ExpenseScreen() {
     return ["All", ...Array.from(seen.values())];
   }, [expenses]);
 
-  // Build daily totals for chart, considering only selected categories (case-insensitive).
-  // If chartSelectedCategories is empty => show all categories.
   const dailyTotals = useMemo(() => {
-    const map = {}; // date -> total
+    const map = {};
     const selected = chartSelectedCategories && chartSelectedCategories.size > 0
       ? new Set(Array.from(chartSelectedCategories).map((s) => s.toLowerCase()))
-      : null; // null means all
+      : null;
 
     expenses.forEach((e) => {
       if (!e) return;
@@ -292,12 +286,9 @@ export default function ExpenseScreen() {
       map[d] += Number(e.amount || 0);
     });
 
-    // convert to sorted array of {date, total} for the last chartDaysWindow days
     const allDates = Object.keys(map).sort((a, b) => (a > b ? 1 : -1));
-    // If there are no dates, return empty arrays
     if (allDates.length === 0) return { labels: [], values: [] };
 
-    // Option: ensure continuous dates for last N days even if zero (so chart x-axis covers consistent window)
     const end = dayjs(allDates[allDates.length - 1]);
     const start = end.subtract(chartDaysWindow - 1, "day");
     const labels = [];
@@ -309,13 +300,6 @@ export default function ExpenseScreen() {
     }
     return { labels, values };
   }, [expenses, chartSelectedCategories, chartDaysWindow]);
-
-  // Chart display conversion
-  const chartLabels = dailyTotals.labels.map((d) => {
-    // show MM-DD for labels to avoid long text
-    return dayjs(d).format("MM-DD");
-  });
-  const chartValues = dailyTotals.values;
 
   // chart size
   const screenWidth = Math.min(Dimensions.get("window").width - 32, 960);
@@ -331,9 +315,17 @@ export default function ExpenseScreen() {
     },
   };
 
-  // ---------- Multiselect handlers (checkbox modal) ----------
+  // Thin labels for readability
+  const maxLabels = 12;
+  const step = Math.ceil(dailyTotals.labels.length / maxLabels);
+  const thinnedLabels = dailyTotals.labels.map((lbl, idx) =>
+    idx % step === 0 ? dayjs(lbl).format("MM-DD") : ""
+  );
+
+  const chartValues = dailyTotals.values;
+
+  // ---------- Multiselect handlers ----------
   const toggleCategorySelection = (catOriginal) => {
-    // catOriginal is original-case; convert to lower for key
     const key = (catOriginal || "").toLowerCase();
     setChartSelectedCategories((prev) => {
       const next = new Set(prev);
@@ -345,7 +337,6 @@ export default function ExpenseScreen() {
   };
 
   const selectAllCategories = () => {
-    // select all (except the 'All' label)
     const setAll = new Set();
     categories.forEach((c) => {
       if (c === "All") return;
@@ -361,16 +352,16 @@ export default function ExpenseScreen() {
   };
 
   // ---------- UI ----------
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#111827" }}>
-    <View style={styles.topBar}>
-      <TouchableOpacity onPress={() => setShowMenu(true)}>
-        <Text style={{ fontSize: 28, color: "#fff" }}>☰</Text>
-      </TouchableOpacity>
-      <Text style={styles.heading}>Student Expense Tracker</Text>
-    </View>
-      {/* Slide-out Menu Modal */}
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={() => setShowMenu(true)}>
+          <Text style={styles.hamburger}>☰</Text>
+        </TouchableOpacity>
+        <Text style={styles.heading}>Student Expense Tracker</Text>
+      </View>
+
+      {/* Slide-out Menu */}
       <Modal visible={showMenu} transparent animationType="fade">
         <TouchableOpacity
           style={styles.menuOverlay}
@@ -379,7 +370,6 @@ export default function ExpenseScreen() {
         >
           <View style={styles.menu}>
             <Text style={styles.menuTitle}>Menu</Text>
-
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
@@ -415,11 +405,8 @@ export default function ExpenseScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* ---------- Expenses Screen (no ScrollView wrapper around FlatList) ---------- */}
       {activeScreen === "expenses" ? (
         <View style={{ flex: 1 }}>
-          <Text style={styles.heading}>Student Expense Tracker</Text>
-
           <View style={styles.form}>
             <TextInput
               style={styles.input}
@@ -457,7 +444,6 @@ export default function ExpenseScreen() {
             />
           </View>
 
-          {/* Filters */}
           <View style={styles.filterRow}>
             {["All", "This Week", "This Month"].map((f) => (
               <TouchableOpacity
@@ -470,7 +456,6 @@ export default function ExpenseScreen() {
             ))}
           </View>
 
-          {/* Sort Dropdown */}
           <View style={{ marginBottom: 12 }}>
             <TouchableOpacity
               style={styles.dropdownButton}
@@ -519,7 +504,6 @@ export default function ExpenseScreen() {
             </Modal>
           </View>
 
-          {/* FlatList (scrollable) */}
           <FlatList
             data={expenses}
             keyExtractor={(item) => item.id.toString()}
@@ -529,17 +513,48 @@ export default function ExpenseScreen() {
             contentContainerStyle={{ paddingBottom: 120, paddingTop: 12 }}
           />
 
-          {/* Running Total */}
           <Text style={styles.totalDisplay}>
             Total: ${runningTotal.toFixed(2)}
           </Text>
         </View>
       ) : (
-        /* ---------- Charts Screen (full implementation - Option B1) ---------- */
+        /* Charts Screen */
         <View style={{ flex: 1 }}>
           <Text style={[styles.heading, { marginTop: 16 }]}>Expense Trend (Daily Totals)</Text>
 
-          {/* Chart multi-select button */}
+          {/* Time Range Selector */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => setTimeDropdownVisible(true)}
+            >
+              <Text style={{ color: "#fff" }}>Last {chartDaysWindow} days</Text>
+            </TouchableOpacity>
+
+            <Modal visible={timeDropdownVisible} transparent animationType="fade">
+              <TouchableOpacity
+                style={styles.dropdownOverlay}
+                onPress={() => setTimeDropdownVisible(false)}
+              >
+                <View style={styles.dropdownMenu}>
+                  {[7, 30, 90, 180, 360].map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={styles.dropdownOption}
+                      onPress={() => {
+                        setChartDaysWindow(d);
+                        setTimeDropdownVisible(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownText}>Last {d} days</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </TouchableOpacity>
+            </Modal>
+          </View>
+
+          {/* Chart Category Multi-select */}
           <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
             <TouchableOpacity
               style={styles.dropdownButton}
@@ -606,16 +621,17 @@ export default function ExpenseScreen() {
                 <>
                   <LineChart
                     data={{
-                      labels: chartLabels,
+                      labels: thinnedLabels,
                       datasets: [{ data: chartValues }],
                     }}
-                    width={Math.min(Dimensions.get("window").width - 32, 960)}
+                    width={screenWidth}
                     height={300}
                     yAxisLabel="$"
                     chartConfig={chartConfig}
                     bezier
                     style={{ borderRadius: 12 }}
                     fromZero
+                    verticalLabelRotation={45}
                   />
 
                   <View style={{ marginTop: 10 }}>
@@ -643,11 +659,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0b1117" },
 
   hamburger: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    zIndex: 99,
-    padding: 6,
+    fontSize: 28,
+    color: "#fff",
   },
 
   menuOverlay: {
@@ -669,7 +682,7 @@ const styles = StyleSheet.create({
   menuItem: { paddingVertical: 10 },
   menuItemText: { color: "#fff", fontSize: 16 },
 
-  heading: { fontSize: 22, fontWeight: "700", color: "#fff", marginTop: 56, marginBottom: 12, paddingHorizontal: 16 },
+  heading: { fontSize: 22, fontWeight: "700", color: "#fff", marginBottom: 12, paddingHorizontal: 16 },
 
   form: { marginBottom: 16, gap: 8, paddingHorizontal: 16 },
   input: {
@@ -693,7 +706,7 @@ const styles = StyleSheet.create({
   },
 
   topBar: {
-    paddingTop: Platform.OS === "ios" ? 10 : 0,  // extra spacing for iPhone notch
+    paddingTop: Platform.OS === "ios" ? 40 : 12,
     paddingHorizontal: 16,
     paddingBottom: 12,
     backgroundColor: "#111827",
