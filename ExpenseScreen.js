@@ -25,7 +25,7 @@ dayjs.extend(isoWeek);
 export default function ExpenseScreen() {
   const db = useSQLiteContext();
 
-  // ---------- State: core ----------
+  // ---------- State ----------
   const [expenses, setExpenses] = useState([]);
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
@@ -33,7 +33,6 @@ export default function ExpenseScreen() {
   const [date, setDate] = useState("");
   const [editingId, setEditingId] = useState(null);
 
-  // filters & sorting (for expense list)
   const [filter, setFilter] = useState("All");
   const [sortField, setSortField] = useState("date");
   const [sortDirection, setSortDirection] = useState("DESC");
@@ -41,18 +40,18 @@ export default function ExpenseScreen() {
 
   const [runningTotal, setRunningTotal] = useState(0);
 
-  // menu & screen selection
-  const [showMenu, setShowMenu] = useState(false);
-  const [activeScreen, setActiveScreen] = useState("expenses"); // 'expenses' | 'charts'
+  const [activeScreen, setActiveScreen] = useState("form"); // 'form' | 'dashboard'
 
-  // Chart-specific state
+  // Chart state
   const [chartMultiselectModalVisible, setChartMultiselectModalVisible] = useState(false);
   const [chartSelectedCategories, setChartSelectedCategories] = useState(new Set());
-  const [chartShowAllToggle, setChartShowAllToggle] = useState(true); // helper for UI select all / none
-  const [chartDaysWindow, setChartDaysWindow] = useState(30); // default chart window
-  const [timeDropdownVisible, setTimeDropdownVisible] = useState(false); // for time range selector
+  const [chartShowAllToggle, setChartShowAllToggle] = useState(true);
+  const [chartDaysWindow, setChartDaysWindow] = useState(30);
+  const [timeDropdownVisible, setTimeDropdownVisible] = useState(false);
 
-  // ---------- Database setup & loading ----------
+  const timeOptions = [7, 30, 90, 180, 360];
+
+  // ---------- Database ----------
   useEffect(() => {
     async function setup() {
       try {
@@ -77,39 +76,22 @@ export default function ExpenseScreen() {
     loadExpenses();
   }, [filter, sortField, sortDirection]);
 
-  // Reset chart filters when leaving chart screen
-  useEffect(() => {
-    if (activeScreen !== "charts") {
-      setChartSelectedCategories(new Set());
-      setChartShowAllToggle(true);
-      setChartMultiselectModalVisible(false);
-    }
-  }, [activeScreen]);
-
   const loadExpenses = async () => {
     try {
       const rows = (await db.getAllAsync("SELECT * FROM expenses;")) || [];
 
-      // Apply date filter (This Week / This Month)
       const filtered = rows.filter((exp) => {
         if (!exp.date) return true;
         const expDate = dayjs(exp.date);
         const today = dayjs();
-
         if (filter === "This Week") {
-          return (
-            expDate.isoWeek() === today.isoWeek() &&
-            expDate.year() === today.year()
-          );
+          return expDate.isoWeek() === today.isoWeek() && expDate.year() === today.year();
         } else if (filter === "This Month") {
-          return (
-            expDate.month() === today.month() && expDate.year() === today.year()
-          );
+          return expDate.month() === today.month() && expDate.year() === today.year();
         }
         return true;
       });
 
-      // Apply sorting
       filtered.sort((a, b) => {
         let x = a[sortField];
         let y = b[sortField];
@@ -128,12 +110,7 @@ export default function ExpenseScreen() {
       });
 
       setExpenses(filtered);
-
-      // Calculate running total
-      const total = filtered.reduce(
-        (sum, exp) => sum + parseFloat(exp.amount || 0),
-        0
-      );
+      const total = filtered.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
       setRunningTotal(total);
     } catch (e) {
       console.error("loadExpenses error:", e);
@@ -172,15 +149,11 @@ export default function ExpenseScreen() {
     try {
       await db.runAsync(
         "INSERT INTO expenses (amount, category, note, date) VALUES (?, ?, ?, ?)",
-        [
-          parseFloat(amount),
-          category.trim(),
-          note.trim() || null,
-          date || dayjs().format("YYYY-MM-DD"),
-        ]
+        [parseFloat(amount), category.trim(), note.trim() || null, date || dayjs().format("YYYY-MM-DD")]
       );
       resetForm();
       loadExpenses();
+      setActiveScreen("dashboard");
     } catch (e) {
       console.error("addExpense error:", e);
       Alert.alert("Database Error", "Could not add expense.");
@@ -193,6 +166,7 @@ export default function ExpenseScreen() {
     setCategory(expense.category);
     setNote(expense.note || "");
     setDate(expense.date || "");
+    setActiveScreen("form");
   };
 
   const editExpense = async () => {
@@ -203,16 +177,11 @@ export default function ExpenseScreen() {
         `UPDATE expenses
          SET amount=?, category=?, note=?, date=?
          WHERE id=?`,
-        [
-          parseFloat(amount),
-          category.trim(),
-          note.trim() || null,
-          date || dayjs().format("YYYY-MM-DD"),
-          editingId,
-        ]
+        [parseFloat(amount), category.trim(), note.trim() || null, date || dayjs().format("YYYY-MM-DD"), editingId]
       );
       resetForm();
       loadExpenses();
+      setActiveScreen("dashboard");
     } catch (e) {
       console.error("editExpense error:", e);
       Alert.alert("Database Error", "Could not update expense.");
@@ -238,7 +207,7 @@ export default function ExpenseScreen() {
     ]);
   };
 
-  // ---------- Render item ----------
+  // ---------- List helpers ----------
   const renderExpense = ({ item }) => (
     <View style={styles.expenseRow}>
       <View style={{ flex: 1 }}>
@@ -247,11 +216,9 @@ export default function ExpenseScreen() {
         {item.note ? <Text style={styles.expenseNote}>{item.note}</Text> : null}
         {item.date ? <Text style={styles.expenseNote}>Date: {item.date}</Text> : null}
       </View>
-
       <TouchableOpacity onPress={() => startEditing(item)} style={{ marginRight: 12 }}>
         <Text style={styles.edit}>✎</Text>
       </TouchableOpacity>
-
       <TouchableOpacity onPress={() => deleteExpense(item.id)}>
         <Text style={styles.delete}>✕</Text>
       </TouchableOpacity>
@@ -272,10 +239,7 @@ export default function ExpenseScreen() {
 
   const dailyTotals = useMemo(() => {
     const map = {};
-    const selected = chartSelectedCategories && chartSelectedCategories.size > 0
-      ? new Set(Array.from(chartSelectedCategories).map((s) => s.toLowerCase()))
-      : null;
-
+    const selected = chartSelectedCategories.size > 0 ? new Set(Array.from(chartSelectedCategories).map(s => s.toLowerCase())) : null;
     expenses.forEach((e) => {
       if (!e) return;
       const cat = (e.category || "").toLowerCase();
@@ -287,7 +251,7 @@ export default function ExpenseScreen() {
     });
 
     const allDates = Object.keys(map).sort((a, b) => (a > b ? 1 : -1));
-    if (allDates.length === 0) return { labels: [], values: [] };
+    if (!allDates.length) return { labels: [], values: [] };
 
     const end = dayjs(allDates[allDates.length - 1]);
     const start = end.subtract(chartDaysWindow - 1, "day");
@@ -301,7 +265,6 @@ export default function ExpenseScreen() {
     return { labels, values };
   }, [expenses, chartSelectedCategories, chartDaysWindow]);
 
-  // chart size
   const screenWidth = Math.min(Dimensions.get("window").width - 32, 960);
   const chartConfig = {
     backgroundGradientFrom: "#0f1724",
@@ -309,346 +272,151 @@ export default function ExpenseScreen() {
     decimalPlaces: 2,
     color: (opacity = 1) => `rgba(96,165,250, ${opacity})`,
     labelColor: (opacity = 1) => `rgba(156,163,175, ${opacity})`,
-    propsForDots: {
-      r: "3",
-      strokeWidth: "0",
-    },
+    propsForDots: { r: "3", strokeWidth: "0" },
   };
 
-  // Thin labels for readability
   const maxLabels = 12;
   const step = Math.ceil(dailyTotals.labels.length / maxLabels);
-  const thinnedLabels = dailyTotals.labels.map((lbl, idx) =>
-    idx % step === 0 ? dayjs(lbl).format("MM-DD") : ""
-  );
+  const thinnedLabels = dailyTotals.labels.map((lbl, idx) => (idx % step === 0 ? dayjs(lbl).format("MM-DD") : ""));
 
   const chartValues = dailyTotals.values;
 
-  // ---------- Multiselect handlers ----------
-  const toggleCategorySelection = (catOriginal) => {
-    const key = (catOriginal || "").toLowerCase();
-    setChartSelectedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      setChartShowAllToggle(false);
-      return next;
-    });
-  };
-
-  const selectAllCategories = () => {
-    const setAll = new Set();
-    categories.forEach((c) => {
-      if (c === "All") return;
-      setAll.add(c.toLowerCase());
-    });
-    setChartSelectedCategories(setAll);
-    setChartShowAllToggle(true);
-  };
-
-  const clearCategorySelection = () => {
-    setChartSelectedCategories(new Set());
-    setChartShowAllToggle(false);
-  };
-
-  // ---------- UI ----------
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#111827" }}>
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => setShowMenu(true)}>
-          <Text style={styles.hamburger}>☰</Text>
-        </TouchableOpacity>
-        <Text style={styles.heading}>Student Expense Tracker</Text>
+  // ---------- Dashboard: List + Chart ----------
+  const renderDashboard = () => (
+    <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      {/* Filters */}
+      <View style={styles.filterRow}>
+        {["All", "This Week", "This Month"].map((f) => (
+          <TouchableOpacity
+            key={f}
+            onPress={() => setFilter(f)}
+            style={[styles.filterButton, filter === f && styles.filterActive]}
+          >
+            <Text style={{ color: "#fff" }}>{f}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {/* Slide-out Menu */}
-      <Modal visible={showMenu} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.menuOverlay}
-          activeOpacity={1}
-          onPress={() => setShowMenu(false)}
-        >
-          <View style={styles.menu}>
-            <Text style={styles.menuTitle}>Menu</Text>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setActiveScreen("expenses");
-                setShowMenu(false);
-              }}
-            >
-              <Text style={styles.menuItemText}>Expenses</Text>
-            </TouchableOpacity>
+      {/* Expense List */}
+      <FlatList
+        data={expenses}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderExpense}
+        scrollEnabled={false}
+        ListEmptyComponent={<Text style={styles.empty}>No expenses yet.</Text>}
+      />
+      <Text style={styles.totalDisplay}>Total: ${runningTotal.toFixed(2)}</Text>
 
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setActiveScreen("charts");
-                setShowMenu(false);
-              }}
-            >
-              <Text style={styles.menuItemText}>Charts</Text>
-            </TouchableOpacity>
+      {/* Chart Controls */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", padding: 16 }}>
+        <TouchableOpacity style={styles.dropdownButton} onPress={() => setChartMultiselectModalVisible(true)}>
+          <Text style={{ color: "#fff" }}>
+            {chartSelectedCategories.size === 0 ? "Categories: All" : `Categories: ${Array.from(chartSelectedCategories).join(", ")}`}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.dropdownButton} onPress={() => setTimeDropdownVisible(true)}>
+          <Text style={{ color: "#fff" }}>Last {chartDaysWindow} days</Text>
+        </TouchableOpacity>
+      </View>
 
-            <TouchableOpacity
-              style={[styles.menuItem, { marginTop: 20 }]}
-              onPress={() => {
-                resetForm();
-                setShowMenu(false);
-              }}
-            >
-              <Text style={[styles.menuItemText, { color: "#fbbf24" }]}>
-                Clear Form
-              </Text>
-            </TouchableOpacity>
+      {/* Chart */}
+      <ScrollView horizontal>
+        <LineChart
+          data={{ labels: thinnedLabels, datasets: [{ data: chartValues }] }}
+          width={Math.max(screenWidth, chartValues.length * 32)}
+          height={300}
+          yAxisLabel="$"
+          chartConfig={chartConfig}
+          fromZero
+          style={{ marginHorizontal: 16, borderRadius: 12 }}
+        />
+      </ScrollView>
+
+      <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+        <Text style={{ color: "#e5e7eb", fontSize: 14 }}>Total in chart: ${chartValues.reduce((s, n) => s + n, 0).toFixed(2)}</Text>
+      </View>
+
+      {/* Category Multiselect Modal */}
+      <Modal visible={chartMultiselectModalVisible} transparent animationType="fade">
+        <TouchableOpacity style={styles.dropdownOverlay} onPress={() => setChartMultiselectModalVisible(false)}>
+          <View style={[styles.dropdownMenu, { width: 320, maxHeight: 360 }]}>
+            <Text style={{ color: "#fff", marginBottom: 8, fontWeight: "700" }}>Select categories</Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+              <TouchableOpacity onPress={() => {
+                const setAll = new Set();
+                categories.forEach(c => { if(c !== "All") setAll.add(c.toLowerCase()) });
+                setChartSelectedCategories(setAll);
+                setChartShowAllToggle(true);
+              }}>
+                <Text style={{ color: "#60a5fa" }}>Select All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setChartSelectedCategories(new Set()); setChartShowAllToggle(false); }}>
+                <Text style={{ color: "#f87171" }}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 260 }}>
+              {categories.filter(c => c !== "All").map(c => {
+                const key = c.toLowerCase();
+                const checked = chartSelectedCategories.has(key);
+                return (
+                  <TouchableOpacity key={c} style={styles.checkboxRow} onPress={() => {
+                    const next = new Set(chartSelectedCategories);
+                    if (next.has(key)) next.delete(key); else next.add(key);
+                    setChartSelectedCategories(next);
+                  }}>
+                    <View style={[styles.checkbox, checked && styles.checkboxChecked]}>{checked && <Text style={styles.checkboxTick}>✓</Text>}</View>
+                    <Text style={{ color: "#fff", marginLeft: 8 }}>{c}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <View style={{ marginTop: 12 }}><Button title="Done" onPress={() => setChartMultiselectModalVisible(false)} /></View>
           </View>
         </TouchableOpacity>
       </Modal>
 
-      {activeScreen === "expenses" ? (
-        <View style={{ flex: 1 }}>
-          <View style={styles.form}>
-            <TextInput
-              style={styles.input}
-              placeholder="Amount (e.g. 12.50)"
-              placeholderTextColor="#9ca3af"
-              keyboardType="numeric"
-              value={amount}
-              onChangeText={setAmount}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Category (Food, Books, Rent...)"
-              placeholderTextColor="#9ca3af"
-              value={category}
-              onChangeText={setCategory}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Note (optional)"
-              placeholderTextColor="#9ca3af"
-              value={note}
-              onChangeText={setNote}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Date (YYYY-MM-DD)"
-              placeholderTextColor="#9ca3af"
-              value={date}
-              onChangeText={setDate}
-            />
-
-            <Button
-              title={editingId ? "Save Changes" : "Add Expense"}
-              onPress={editingId ? editExpense : addExpense}
-            />
-          </View>
-
-          <View style={styles.filterRow}>
-            {["All", "This Week", "This Month"].map((f) => (
-              <TouchableOpacity
-                key={f}
-                onPress={() => setFilter(f)}
-                style={[styles.filterButton, filter === f && styles.filterActive]}
-              >
-                <Text style={{ color: "#fff" }}>{f}</Text>
+      {/* Time Dropdown Modal */}
+      <Modal visible={timeDropdownVisible} transparent animationType="fade">
+        <TouchableOpacity style={styles.dropdownOverlay} onPress={() => setTimeDropdownVisible(false)}>
+          <View style={[styles.dropdownMenu, { width: 180 }]}>
+            {timeOptions.map(opt => (
+              <TouchableOpacity key={opt} style={styles.dropdownOption} onPress={() => { setChartDaysWindow(opt); setTimeDropdownVisible(false); }}>
+                <Text style={styles.dropdownText}>{opt} days</Text>
               </TouchableOpacity>
             ))}
           </View>
+        </TouchableOpacity>
+      </Modal>
+    </ScrollView>
+  );
 
-          <View style={{ marginBottom: 12 }}>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setDropdownVisible(true)}
-            >
-              <Text style={{ color: "#fff" }}>
-                Sort by: {sortField} ({sortDirection})
-              </Text>
-            </TouchableOpacity>
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#111827" }}>
+      <View style={styles.topBar}>
+        <Text style={styles.heading}>Student Expense Tracker</Text>
+      </View>
 
-            <Modal transparent visible={dropdownVisible} animationType="fade">
-              <TouchableOpacity
-                style={styles.dropdownOverlay}
-                onPress={() => setDropdownVisible(false)}
-              >
-                <View style={styles.dropdownMenu}>
-                  {["date", "amount", "category"].map((field) => (
-                    <TouchableOpacity
-                      key={field}
-                      style={styles.dropdownOption}
-                      onPress={() => {
-                        setSortField(field);
-                        setDropdownVisible(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownText}>{field}</Text>
-                    </TouchableOpacity>
-                  ))}
+      {/* Tab Selector */}
+      <View style={{ flexDirection: "row", justifyContent: "space-around", paddingVertical: 8 }}>
+        {["form", "dashboard"].map((tab) => (
+          <TouchableOpacity key={tab} onPress={() => setActiveScreen(tab)}>
+            <Text style={{ color: activeScreen === tab ? "#60a5fa" : "#fff", fontWeight: "600" }}>
+              {tab === "form" ? "Add Expense" : "Dashboard"}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-                  <View style={{ height: 1, backgroundColor: "#555", marginVertical: 8 }} />
-
-                  {["ASC", "DESC"].map((dir) => (
-                    <TouchableOpacity
-                      key={dir}
-                      style={styles.dropdownOption}
-                      onPress={() => {
-                        setSortDirection(dir);
-                        setDropdownVisible(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownText}>{dir}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </TouchableOpacity>
-            </Modal>
-          </View>
-
-          <FlatList
-            data={expenses}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderExpense}
-            ListEmptyComponent={<Text style={styles.empty}>No expenses yet.</Text>}
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingBottom: 120, paddingTop: 12 }}
-          />
-
-          <Text style={styles.totalDisplay}>
-            Total: ${runningTotal.toFixed(2)}
-          </Text>
+      {activeScreen === "form" ? (
+        <View style={{ flex: 1, padding: 16 }}>
+          <TextInput style={styles.input} placeholder="Amount" placeholderTextColor="#9ca3af" keyboardType="numeric" value={amount} onChangeText={setAmount} />
+          <TextInput style={styles.input} placeholder="Category" placeholderTextColor="#9ca3af" value={category} onChangeText={setCategory} />
+          <TextInput style={styles.input} placeholder="Note" placeholderTextColor="#9ca3af" value={note} onChangeText={setNote} />
+          <TextInput style={styles.input} placeholder="Date (YYYY-MM-DD)" placeholderTextColor="#9ca3af" value={date} onChangeText={setDate} />
+          <Button title={editingId ? "Save Changes" : "Add Expense"} onPress={editingId ? editExpense : addExpense} />
         </View>
       ) : (
-        /* Charts Screen */
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.heading, { marginTop: 16 }]}>Expense Trend (Daily Totals)</Text>
-
-          {/* Time Range Selector */}
-          <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setTimeDropdownVisible(true)}
-            >
-              <Text style={{ color: "#fff" }}>Last {chartDaysWindow} days</Text>
-            </TouchableOpacity>
-
-            <Modal visible={timeDropdownVisible} transparent animationType="fade">
-              <TouchableOpacity
-                style={styles.dropdownOverlay}
-                onPress={() => setTimeDropdownVisible(false)}
-              >
-                <View style={styles.dropdownMenu}>
-                  {[7, 30, 90, 180, 360].map((d) => (
-                    <TouchableOpacity
-                      key={d}
-                      style={styles.dropdownOption}
-                      onPress={() => {
-                        setChartDaysWindow(d);
-                        setTimeDropdownVisible(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownText}>Last {d} days</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </TouchableOpacity>
-            </Modal>
-          </View>
-
-          {/* Chart Category Multi-select */}
-          <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setChartMultiselectModalVisible(true)}
-            >
-              <Text style={{ color: "#fff" }}>
-                {chartSelectedCategories.size === 0 ? "Categories: All" : `Categories: ${Array.from(chartSelectedCategories).join(", ")}`}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Multiselect modal */}
-          <Modal
-            visible={chartMultiselectModalVisible}
-            transparent
-            animationType="fade"
-          >
-            <TouchableOpacity
-              style={styles.dropdownOverlay}
-              onPress={() => setChartMultiselectModalVisible(false)}
-            >
-              <View style={[styles.dropdownMenu, { width: 320, maxHeight: 360 }]}>
-                <Text style={{ color: "#fff", marginBottom: 8, fontWeight: "700" }}>Select categories</Text>
-
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-                  <TouchableOpacity onPress={selectAllCategories}>
-                    <Text style={{ color: "#60a5fa" }}>Select All</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity onPress={clearCategorySelection}>
-                    <Text style={{ color: "#f87171" }}>Clear</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView style={{ maxHeight: 260 }}>
-                  {categories.filter(c => c !== "All").map((c) => {
-                    const key = c.toLowerCase();
-                    const checked = chartSelectedCategories.has(key);
-                    return (
-                      <TouchableOpacity
-                        key={c}
-                        style={styles.checkboxRow}
-                        onPress={() => toggleCategorySelection(c)}
-                      >
-                        <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-                          {checked && <Text style={styles.checkboxTick}>✓</Text>}
-                        </View>
-                        <Text style={{ color: "#fff", marginLeft: 8 }}>{c}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-
-                <View style={{ marginTop: 12 }}>
-                  <Button title="Done" onPress={() => setChartMultiselectModalVisible(false)} />
-                </View>
-              </View>
-            </TouchableOpacity>
-          </Modal>
-
-          <ScrollView contentContainerStyle={{ padding: 16 }}>
-            <View style={{ backgroundColor: "#0b1220", padding: 12, borderRadius: 12 }}>
-              {chartValues && chartValues.length > 0 ? (
-                <>
-                  <LineChart
-                    data={{
-                      labels: thinnedLabels,
-                      datasets: [{ data: chartValues }],
-                    }}
-                    width={screenWidth}
-                    height={300}
-                    yAxisLabel="$"
-                    chartConfig={chartConfig}
-                    bezier
-                    style={{ borderRadius: 12 }}
-                    fromZero
-                    verticalLabelRotation={45}
-                  />
-
-                  <View style={{ marginTop: 10 }}>
-                    <Text style={{ color: "#e5e7eb", fontSize: 14 }}>
-                      Showing last {chartDaysWindow} days • Total: ${chartValues.reduce((s, n) => s + n, 0).toFixed(2)}
-                    </Text>
-                    <Text style={{ color: "#9ca3af", fontSize: 12, marginTop: 6 }}>
-                      Filter: {chartSelectedCategories.size === 0 ? "All categories" : Array.from(chartSelectedCategories).join(", ")}
-                    </Text>
-                  </View>
-                </>
-              ) : (
-                <Text style={{ color: "#9ca3af", padding: 12 }}>No data for selected categories / date range.</Text>
-              )}
-            </View>
-          </ScrollView>
-        </View>
+        renderDashboard()
       )}
     </SafeAreaView>
   );
