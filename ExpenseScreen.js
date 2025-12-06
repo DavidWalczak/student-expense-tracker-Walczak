@@ -57,9 +57,8 @@ export default function ExpenseScreen() {
   const [chartTouchedX, setChartTouchedX] = useState(null);
   const [chartTouchedValue, setChartTouchedValue] = useState(null);
 
-  // Animations
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const [slideAnim] = useState(new Animated.Value(Dimensions.get("window").width));
+  // Animations (list-item only; removed screen transition animations)
+  const [listFadeAnim] = useState(new Animated.Value(1));
 
   const timeOptions = [7, 30, 90, 180, 360];
   const currencies = ["$", "€", "£", "¥"];
@@ -93,22 +92,6 @@ export default function ExpenseScreen() {
   useEffect(() => {
     loadExpenses();
   }, [filter, sortField, sortDirection]);
-
-  useEffect(() => {
-    animateScreenTransition();
-  }, [activeScreen]);
-
-  const animateScreenTransition = () => {
-    Animated.sequence([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: Dimensions.get("window").width, duration: 150, useNativeDriver: true }),
-    ]).start(() => {
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-      ]).start();
-    });
-  };
 
   const loadExpenses = async () => {
     try {
@@ -239,7 +222,7 @@ export default function ExpenseScreen() {
   };
 
   const animateListItem = () => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+    Animated.timing(listFadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
   };
 
   // ---------- Date Picker ----------
@@ -264,7 +247,7 @@ export default function ExpenseScreen() {
     const newestBorder = darkMode ? "#10b981" : "#059669";
 
     return (
-      <Animated.View style={[{ opacity: fadeAnim }]}>
+      <Animated.View style={[{ opacity: listFadeAnim }]}>
         <View style={[styles.expenseRow, isNewest && { backgroundColor: newestBg, borderLeftWidth: 4, borderLeftColor: newestBorder }]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.expenseAmount, { color: expenseAmountColor }]}>
@@ -348,7 +331,7 @@ export default function ExpenseScreen() {
     const thinnedLabels = dailyTotals.labels.map((lbl, idx) => (idx % step === 0 ? dayjs(lbl).format("MM-DD") : ""));
 
     return (
-      <Animated.View style={[{ flex: 1 }, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
+      <View style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
           {/* Chart */}
           <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
@@ -412,7 +395,7 @@ export default function ExpenseScreen() {
           {/* Running total */}
           <Text style={[styles.totalDisplay, { color: darkMode ? "#fbbf24" : "#b45309" }]}>Total: {currency}{runningTotal.toFixed(2)}</Text>
         </View>
-      </Animated.View>
+      </View>
     );
   };
 
@@ -480,7 +463,7 @@ export default function ExpenseScreen() {
       </View>
 
       {activeScreen === "form" ? (
-        <Animated.View style={[{ flex: 1, padding: 16 }, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
+        <View style={{ flex: 1, padding: 16 }}>
           <TextInput
             style={[styles.input, { color: textColor, backgroundColor: darkMode ? "#0f1724" : "#ffffff", borderColor: darkMode ? "#1f2937" : "#d1d5db" }]}
             placeholder="Amount"
@@ -510,7 +493,15 @@ export default function ExpenseScreen() {
           </TouchableOpacity>
 
           {showDatePicker && (
-            <DateTimePicker value={dayjs(date).toDate()} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={handleDateChange} />
+            <DateTimePicker
+              value={dayjs(date).toDate()}
+              mode="date"
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              onChange={handleDateChange}
+              textColor={textColor}
+              themeVariant={darkMode ? "dark" : "light"}
+              style={Platform.OS === "ios" ? { backgroundColor: darkMode ? "#0f1724" : "#ffffff" } : undefined}
+            />
           )}
 
           {Platform.OS === "ios" && showDatePicker && (
@@ -521,7 +512,7 @@ export default function ExpenseScreen() {
 
           <Button title={editingId ? "Save Changes" : "Add Expense"} onPress={editingId ? editExpense : addExpense} color="#60a5fa" />
             
-          </Animated.View>
+          </View>
         ) : (
           renderDashboard()
         )}
