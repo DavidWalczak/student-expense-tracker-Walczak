@@ -13,6 +13,7 @@ import {
   Alert,
   Dimensions,
   ScrollView,
+  Platform,
 } from "react-native";
 import { useSQLiteContext } from "expo-sqlite";
 import dayjs from "dayjs";
@@ -362,15 +363,13 @@ export default function ExpenseScreen() {
   // ---------- UI ----------
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Hamburger Button */}
-      <TouchableOpacity
-        onPress={() => setShowMenu(true)}
-        style={styles.hamburger}
-      >
-        <Text style={{ fontSize: 30, color: "#fff" }}>☰</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#111827" }}>
+    <View style={styles.topBar}>
+      <TouchableOpacity onPress={() => setShowMenu(true)}>
+        <Text style={{ fontSize: 28, color: "#fff" }}>☰</Text>
       </TouchableOpacity>
-
+      <Text style={styles.heading}>Student Expense Tracker</Text>
+    </View>
       {/* Slide-out Menu Modal */}
       <Modal visible={showMenu} transparent animationType="fade">
         <TouchableOpacity
@@ -691,6 +690,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginHorizontal: 16,
     marginBottom: 8,
+  },
+
+  topBar: {
+    paddingTop: Platform.OS === "ios" ? 10 : 0,  // extra spacing for iPhone notch
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: "#111827",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
 
   expenseAmount: { fontSize: 18, fontWeight: "700", color: "#fbbf24" },
