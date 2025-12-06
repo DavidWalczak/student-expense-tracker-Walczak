@@ -657,144 +657,34 @@ export default function ExpenseScreen() {
 //----------- Styles -----------
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0b1117" },
-
-  hamburger: {
-    fontSize: 28,
-    color: "#fff",
-  },
-
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-start",
-  },
-
-  menu: {
-    width: 260,
-    padding: 20,
-    backgroundColor: "#111827",
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
-    marginTop: 40,
-  },
-
+  hamburger: { fontSize: 28, color: "#fff" },
+  menuOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-start" },
+  menu: { width: 260, padding: 20, backgroundColor: "#111827", borderTopRightRadius: 12, borderBottomRightRadius: 12, marginTop: 40 },
   menuTitle: { color: "#fff", fontSize: 20, marginBottom: 10 },
   menuItem: { paddingVertical: 10 },
   menuItemText: { color: "#fff", fontSize: 16 },
-
   heading: { fontSize: 22, fontWeight: "700", color: "#fff", marginBottom: 12, paddingHorizontal: 16 },
-
   form: { marginBottom: 16, gap: 8, paddingHorizontal: 16 },
-  input: {
-    padding: 10,
-    backgroundColor: "#0f1724",
-    color: "#fff",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#1f2937",
-    marginBottom: 8,
-  },
-
-  expenseRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#0f1724",
-    padding: 12,
-    borderRadius: 8,
-    marginHorizontal: 16,
-    marginBottom: 8,
-  },
-
-  topBar: {
-    paddingTop: Platform.OS === "ios" ? 40 : 12,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: "#111827",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-
+  input: { padding: 10, backgroundColor: "#0f1724", color: "#fff", borderRadius: 8, borderWidth: 1, borderColor: "#1f2937", marginBottom: 8 },
+  expenseRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#0f1724", padding: 12, borderRadius: 8, marginHorizontal: 16, marginBottom: 8 },
+  topBar: { paddingTop: Platform.OS === "ios" ? 40 : 12, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: "#111827", flexDirection: "row", alignItems: "center", gap: 12 },
   expenseAmount: { fontSize: 18, fontWeight: "700", color: "#fbbf24" },
   expenseCategory: { fontSize: 14, color: "#e5e7eb" },
   expenseNote: { fontSize: 12, color: "#9ca3af" },
   edit: { color: "#60a5fa", fontSize: 20, marginLeft: 12 },
   delete: { color: "#f87171", fontSize: 20, marginLeft: 12 },
   empty: { color: "#9ca3af", marginTop: 24, textAlign: "center" },
-
-  filterRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginVertical: 12,
-    paddingHorizontal: 8,
-  },
-
-  filterButton: {
-    padding: 8,
-    backgroundColor: "#1f2937",
-    borderRadius: 8,
-  },
+  filterRow: { flexDirection: "row", justifyContent: "space-around", marginVertical: 12, paddingHorizontal: 8 },
+  filterButton: { padding: 8, backgroundColor: "#1f2937", borderRadius: 8 },
   filterActive: { backgroundColor: "#60a5fa" },
-
-  dropdownButton: {
-    padding: 10,
-    backgroundColor: "#0f1724",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#1f2937",
-    marginHorizontal: 16,
-  },
-
-  dropdownOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-
-  dropdownMenu: {
-    width: 220,
-    backgroundColor: "#0f1724",
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#1f2937",
-  },
-
+  dropdownButton: { padding: 10, backgroundColor: "#0f1724", borderRadius: 8, borderWidth: 1, borderColor: "#1f2937", marginHorizontal: 16 },
+  dropdownOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" },
+  dropdownMenu: { width: 220, backgroundColor: "#0f1724", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: "#1f2937" },
   dropdownOption: { padding: 10 },
   dropdownText: { color: "#fff", fontSize: 16 },
-
-  totalDisplay: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#fbbf24",
-    textAlign: "center",
-    marginVertical: 12,
-  },
-
-  // multiselect checkbox UI
-  checkboxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: "#374151",
-    backgroundColor: "#0f1724",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  checkboxChecked: {
-    backgroundColor: "#60a5fa",
-    borderColor: "#60a5fa",
-  },
-  checkboxTick: {
-    color: "#0b1117",
-    fontWeight: "700",
-    fontSize: 12,
-  },
+  totalDisplay: { fontSize: 18, fontWeight: "700", color: "#fbbf24", textAlign: "center", marginVertical: 12 },
+  checkboxRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8 },
+  checkbox: { width: 20, height: 20, borderRadius: 3, borderWidth: 1, borderColor: "#374151", backgroundColor: "#0f1724", justifyContent: "center", alignItems: "center" },
+  checkboxChecked: { backgroundColor: "#60a5fa", borderColor: "#60a5fa" },
+  checkboxTick: { color: "#0b1117", fontWeight: "700", fontSize: 12 },
 });
