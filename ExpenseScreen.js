@@ -54,7 +54,6 @@ export default function ExpenseScreen() {
   const [chartSelectedCategories, setChartSelectedCategories] = useState(new Set());
   const [chartDaysWindow, setChartDaysWindow] = useState(30);
   const [timeDropdownVisible, setTimeDropdownVisible] = useState(false);
-  const [chartAggregation, setChartAggregation] = useState("daily");
   const [chartTouchedX, setChartTouchedX] = useState(null);
   const [chartTouchedValue, setChartTouchedValue] = useState(null);
 
@@ -253,19 +252,27 @@ export default function ExpenseScreen() {
     }
   };
 
-  // ---------- List helpers ----------
+// ---------- List helpers ----------
   const renderExpense = ({ item, index }) => {
     const isNewest = item.id === lastAddedId;
+
+    // dynamic colors for light/dark mode
+    const expenseAmountColor = darkMode ? "#fbbf24" : "#b45309";
+    const expenseCategoryColor = darkMode ? "#e5e7eb" : "#374151";
+    const expenseNoteColor = darkMode ? "#9ca3af" : "#6b7280";
+    const newestBg = darkMode ? "#1f4a3d" : "#e6ffef";
+    const newestBorder = darkMode ? "#10b981" : "#059669";
+
     return (
       <Animated.View style={[{ opacity: fadeAnim }]}>
-        <View style={[styles.expenseRow, isNewest && styles.newestExpense]}>
+        <View style={[styles.expenseRow, isNewest && { backgroundColor: newestBg, borderLeftWidth: 4, borderLeftColor: newestBorder }]}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.expenseAmount}>
+            <Text style={[styles.expenseAmount, { color: expenseAmountColor }]}>
               {currency}{Number(item.amount).toFixed(2)}
             </Text>
-            <Text style={styles.expenseCategory}>{item.category}</Text>
-            {item.note ? <Text style={styles.expenseNote}>{item.note}</Text> : null}
-            {item.date ? <Text style={styles.expenseNote}>Date: {item.date}</Text> : null}
+            <Text style={[styles.expenseCategory, { color: expenseCategoryColor }]}>{item.category}</Text>
+            {item.note ? <Text style={[styles.expenseNote, { color: expenseNoteColor }]}>{item.note}</Text> : null}
+            {item.date ? <Text style={[styles.expenseNote, { color: expenseNoteColor }]}>Date: {item.date}</Text> : null}
           </View>
           <TouchableOpacity onPress={() => startEditing(item)} style={{ marginRight: 12 }}>
             <Text style={styles.edit}>✎</Text>
@@ -312,43 +319,15 @@ export default function ExpenseScreen() {
     const labels = [];
     const values = [];
 
-    if (chartAggregation === "daily") {
-      for (let i = 0; i < chartDaysWindow; i++) {
-        const d = start.add(i, "day").format("YYYY-MM-DD");
-        labels.push(d);
-        values.push(Number(map[d] || 0));
-      }
-    } else if (chartAggregation === "weekly") {
-      let current = start.startOf("week");
-      while (current.isBefore(end) || current.isSame(end)) {
-        const week = current.format("YYYY-[W]ww");
-        let weekTotal = 0;
-        for (let i = 0; i < 7; i++) {
-          const d = current.add(i, "day").format("YYYY-MM-DD");
-          weekTotal += map[d] || 0;
-        }
-        labels.push(week);
-        values.push(weekTotal);
-        current = current.add(1, "week");
-      }
-    } else if (chartAggregation === "monthly") {
-      let current = start.startOf("month");
-      while (current.isBefore(end) || current.isSame(end)) {
-        const month = current.format("YYYY-MM");
-        let monthTotal = 0;
-        const daysInMonth = current.daysInMonth();
-        for (let i = 0; i < daysInMonth; i++) {
-          const d = current.add(i, "day").format("YYYY-MM-DD");
-          monthTotal += map[d] || 0;
-        }
-        labels.push(month);
-        values.push(monthTotal);
-        current = current.add(1, "month");
-      }
+    // only daily aggregation now
+    for (let i = 0; i < chartDaysWindow; i++) {
+      const d = start.add(i, "day").format("YYYY-MM-DD");
+      labels.push(d);
+      values.push(Number(map[d] || 0));
     }
 
     return { labels, values };
-  }, [expenses, chartSelectedCategories, chartDaysWindow, chartAggregation]);
+  }, [expenses, chartSelectedCategories, chartDaysWindow]);
 
   const chartConfig = {
     backgroundGradientFrom: darkMode ? "#0f1724" : "#ffffff",
@@ -398,27 +377,26 @@ export default function ExpenseScreen() {
 
           {/* Filters */}
           <View style={[styles.filterContainer, isSmallScreen && { flexWrap: "wrap" }]}>
-            <TouchableOpacity style={styles.dropdownButton} onPress={() => setChartMultiselectModalVisible(true)}>
+            <TouchableOpacity
+              style={[
+                styles.dropdownButton,
+                { backgroundColor: darkMode ? "#0f1724" : "#ffffff", borderColor: darkMode ? "#1f2937" : "#d1d5db" },
+              ]}
+              onPress={() => setChartMultiselectModalVisible(true)}
+            >
               <Text style={{ color: darkMode ? "#fff" : "#000", fontSize: isSmallScreen ? 12 : 14 }}>
                 {chartSelectedCategories.size === 0 ? "Categories: All" : `Categories: ${Array.from(chartSelectedCategories).join(", ")}`}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.dropdownButton} onPress={() => setTimeDropdownVisible(true)}>
+            <TouchableOpacity
+              style={[
+                styles.dropdownButton,
+                { backgroundColor: darkMode ? "#0f1724" : "#ffffff", borderColor: darkMode ? "#1f2937" : "#d1d5db" },
+              ]}
+              onPress={() => setTimeDropdownVisible(true)}
+            >
               <Text style={{ color: darkMode ? "#fff" : "#000", fontSize: isSmallScreen ? 12 : 14 }}>Last {chartDaysWindow} days</Text>
             </TouchableOpacity>
-            <View style={[styles.dropdownButton, { flexDirection: "row", justifyContent: "space-around" }]}>
-              {["daily", "weekly", "monthly"].map((agg) => (
-                <TouchableOpacity
-                  key={agg}
-                  onPress={() => setChartAggregation(agg)}
-                  style={[styles.aggregationButton, chartAggregation === agg && styles.aggregationActive]}
-                >
-                  <Text style={{ color: chartAggregation === agg ? "#fff" : darkMode ? "#9ca3af" : "#6b7280", fontSize: 11 }}>
-                    {agg.charAt(0).toUpperCase() + agg.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
 
           {/* Expense List */}
@@ -427,12 +405,12 @@ export default function ExpenseScreen() {
             data={expenses}
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderExpense}
-            ListEmptyComponent={<Text style={styles.empty}>No expenses yet.</Text>}
+            ListEmptyComponent={<Text style={[styles.empty, { color: darkMode ? "#9ca3af" : "#6b7280" }]}>No expenses yet.</Text>}
             contentContainerStyle={{ paddingBottom: 120 }}
           />
 
           {/* Running total */}
-          <Text style={styles.totalDisplay}>Total: {currency}{runningTotal.toFixed(2)}</Text>
+          <Text style={[styles.totalDisplay, { color: darkMode ? "#fbbf24" : "#b45309" }]}>Total: {currency}{runningTotal.toFixed(2)}</Text>
         </View>
       </Animated.View>
     );
@@ -444,7 +422,7 @@ export default function ExpenseScreen() {
       <Modal visible={settingsVisible} transparent animationType="slide">
         <SafeAreaView style={{ flex: 1, backgroundColor: darkMode ? "#111827" : "#ffffff" }}>
           <View style={{ flex: 1, padding: 16 }}>
-            <Text style={[styles.heading, { marginBottom: 20 }]}>Settings</Text>
+            <Text style={[styles.heading, { marginBottom: 20, color: darkMode ? "#fff" : "#000" }]}>Settings</Text>
 
             {/* Dark Mode */}
             <View style={styles.settingRow}>
@@ -460,9 +438,9 @@ export default function ExpenseScreen() {
                   <TouchableOpacity
                     key={curr}
                     onPress={() => setCurrency(curr)}
-                    style={[styles.currencyButton, currency === curr && styles.currencyActive]}
+                    style={[styles.currencyButton, currency === curr && styles.currencyActive, { borderColor: darkMode ? "#1f2937" : "#d1d5db", backgroundColor: currency === curr ? "#60a5fa" : darkMode ? "#0f1724" : "#ffffff" }]}
                   >
-                    <Text style={{ color: currency === curr ? "#fff" : darkMode ? "#9ca3af" : "#6b7280" }}>{curr}</Text>
+                    <Text style={{ color: currency === curr ? "#fff" : darkMode ? "#9ca3af" : "#374151" }}>{curr}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -504,7 +482,7 @@ export default function ExpenseScreen() {
       {activeScreen === "form" ? (
         <Animated.View style={[{ flex: 1, padding: 16 }, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
           <TextInput
-            style={[styles.input, { color: textColor, backgroundColor: darkMode ? "#0f1724" : "#f3f4f6" }]}
+            style={[styles.input, { color: textColor, backgroundColor: darkMode ? "#0f1724" : "#ffffff", borderColor: darkMode ? "#1f2937" : "#d1d5db" }]}
             placeholder="Amount"
             placeholderTextColor={darkMode ? "#9ca3af" : "#9ca3af"}
             keyboardType="numeric"
@@ -512,14 +490,14 @@ export default function ExpenseScreen() {
             onChangeText={setAmount}
           />
           <TextInput
-            style={[styles.input, { color: textColor, backgroundColor: darkMode ? "#0f1724" : "#f3f4f6" }]}
+            style={[styles.input, { color: textColor, backgroundColor: darkMode ? "#0f1724" : "#ffffff", borderColor: darkMode ? "#1f2937" : "#d1d5db" }]}
             placeholder="Category"
             placeholderTextColor={darkMode ? "#9ca3af" : "#9ca3af"}
             value={category}
             onChangeText={setCategory}
           />
           <TextInput
-            style={[styles.input, { color: textColor, backgroundColor: darkMode ? "#0f1724" : "#f3f4f6" }]}
+            style={[styles.input, { color: textColor, backgroundColor: darkMode ? "#0f1724" : "#ffffff", borderColor: darkMode ? "#1f2937" : "#d1d5db" }]}
             placeholder="Note"
             placeholderTextColor={darkMode ? "#9ca3af" : "#9ca3af"}
             value={note}
@@ -527,7 +505,7 @@ export default function ExpenseScreen() {
           />
 
           {/* Native Date Picker */}
-          <TouchableOpacity style={[styles.dateButton, { backgroundColor: darkMode ? "#0f1724" : "#f3f4f6" }]} onPress={() => setShowDatePicker(true)}>
+          <TouchableOpacity style={[styles.dateButton, { backgroundColor: darkMode ? "#0f1724" : "#ffffff", borderColor: darkMode ? "#1f2937" : "#d1d5db" }]} onPress={() => setShowDatePicker(true)}>
             <Text style={{ color: textColor }}>{date}</Text>
           </TouchableOpacity>
 
@@ -587,8 +565,8 @@ export default function ExpenseScreen() {
                       setChartSelectedCategories(next);
                     }}
                   >
-                    <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-                      {checked && <Text style={styles.checkboxTick}>✓</Text>}
+                    <View style={[styles.checkbox, { borderColor: darkMode ? "#374151" : "#9ca3af", backgroundColor: checked ? undefined : (darkMode ? "#0f1724" : "#ffffff") }, checked && styles.checkboxChecked]}>
+                      {checked && <Text style={[styles.checkboxTick, { color: darkMode ? "#0b1117" : "#0b1117" }]}>✓</Text>}
                     </View>
                     <Text style={{ color: textColor, marginLeft: 8 }}>{c}</Text>
                   </TouchableOpacity>
@@ -615,7 +593,7 @@ export default function ExpenseScreen() {
                   setTimeDropdownVisible(false);
                 }}
               >
-                <Text style={[styles.dropdownText, { color: textColor }]}>{opt} days</Text>
+                <Text style={[styles.dropdownText, { color: darkMode ? "#fff" : "#000" }]}>{opt} days</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -642,33 +620,33 @@ const styles = StyleSheet.create({
   tabContainer: { flexDirection: "row", justifyContent: "space-around", paddingVertical: 8 },
   tab: { flex: 1, paddingVertical: 8, alignItems: "center" },
   tabActive: { borderBottomWidth: 2, borderBottomColor: "#60a5fa" },
-  input: { padding: 10, borderRadius: 8, borderWidth: 1, borderColor: "#1f2937", marginBottom: 8 },
-  dateButton: { padding: 12, borderRadius: 8, borderWidth: 1, borderColor: "#1f2937", marginBottom: 8, justifyContent: "center" },
+  input: { padding: 10, borderRadius: 8, borderWidth: 1, marginBottom: 8 },
+  dateButton: { padding: 12, borderRadius: 8, borderWidth: 1, marginBottom: 8, justifyContent: "center" },
   datePickerDone: { backgroundColor: "#60a5fa", padding: 12, borderRadius: 8, marginBottom: 8, alignItems: "center" },
   expenseRow: { flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 8, marginHorizontal: 16, marginBottom: 8 },
-  newestExpense: { backgroundColor: "#1f4a3d", borderLeftWidth: 4, borderLeftColor: "#10b981" },
-  expenseAmount: { fontSize: 18, fontWeight: "700", color: "#fbbf24" },
-  expenseCategory: { fontSize: 14, color: "#e5e7eb" },
-  expenseNote: { fontSize: 12, color: "#9ca3af" },
+  newestExpense: { /* replaced by inline dynamic styles */ },
+  expenseAmount: { fontSize: 18, fontWeight: "700" },
+  expenseCategory: { fontSize: 14 },
+  expenseNote: { fontSize: 12 },
   edit: { color: "#60a5fa", fontSize: 20, marginLeft: 12 },
   delete: { color: "#f87171", fontSize: 20, marginLeft: 12 },
-  empty: { color: "#9ca3af", marginTop: 24, textAlign: "center" },
+  empty: { marginTop: 24, textAlign: "center" },
   filterContainer: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 8, paddingVertical: 12, gap: 8 },
-  dropdownButton: { padding: 10, backgroundColor: "#0f1724", borderRadius: 8, borderWidth: 1, borderColor: "#1f2937", flex: 1 },
+  dropdownButton: { padding: 10, borderRadius: 8, borderWidth: 1, flex: 1 },
   aggregationButton: { padding: 6, borderRadius: 6, flex: 1, alignItems: "center" },
   aggregationActive: { backgroundColor: "#60a5fa" },
   dropdownOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" },
-  dropdownMenu: { borderRadius: 10, padding: 10, borderWidth: 1, borderColor: "#1f2937" },
+  dropdownMenu: { borderRadius: 10, padding: 10, borderWidth: 1 },
   dropdownOption: { padding: 10 },
   dropdownText: { fontSize: 16 },
-  totalDisplay: { fontSize: 18, fontWeight: "700", color: "#fbbf24", textAlign: "center", marginVertical: 12 },
+  totalDisplay: { fontSize: 18, fontWeight: "700", textAlign: "center", marginVertical: 12 },
   checkboxRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8 },
-  checkbox: { width: 20, height: 20, borderRadius: 3, borderWidth: 1, borderColor: "#374151", backgroundColor: "#0f1724", justifyContent: "center", alignItems: "center" },
+  checkbox: { width: 20, height: 20, borderRadius: 3, borderWidth: 1, justifyContent: "center", alignItems: "center" },
   checkboxChecked: { backgroundColor: "#60a5fa", borderColor: "#60a5fa" },
-  checkboxTick: { color: "#0b1117", fontWeight: "700", fontSize: 12 },
-  settingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "#1f2937" },
+  checkboxTick: { fontWeight: "700", fontSize: 12 },
+  settingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 16, borderBottomWidth: 1 },
   settingLabel: { fontSize: 16, fontWeight: "600" },
-  currencyButton: { padding: 8, borderRadius: 6, borderWidth: 1, borderColor: "#1f2937" },
+  currencyButton: { padding: 8, borderRadius: 6, borderWidth: 1 },
   currencyActive: { backgroundColor: "#60a5fa", borderColor: "#60a5fa" },
   closeButton: { marginTop: 20, padding: 12, backgroundColor: "#60a5fa", borderRadius: 8, alignItems: "center" },
 });
