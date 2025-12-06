@@ -379,124 +379,124 @@ export default function ExpenseScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Expense Screen */}
       {activeScreen === "expenses" ? (
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <Text style={styles.heading}>Student Expense Tracker</Text>
+  <View style={{ flex: 1 }}>
+    <Text style={styles.heading}>Student Expense Tracker</Text>
 
-          <View style={styles.form}>
-            <TextInput
-              style={styles.input}
-              placeholder="Amount (e.g. 12.50)"
-              placeholderTextColor="#9ca3af"
-              keyboardType="numeric"
-              value={amount}
-              onChangeText={setAmount}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Category (Food, Books, Rent...)"
-              placeholderTextColor="#9ca3af"
-              value={category}
-              onChangeText={setCategory}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Note (optional)"
-              placeholderTextColor="#9ca3af"
-              value={note}
-              onChangeText={setNote}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Date (YYYY-MM-DD)"
-              placeholderTextColor="#9ca3af"
-              value={date}
-              onChangeText={setDate}
-            />
+    <View style={styles.form}>
+      <TextInput
+        style={styles.input}
+        placeholder="Amount (e.g. 12.50)"
+        placeholderTextColor="#9ca3af"
+        keyboardType="numeric"
+        value={amount}
+        onChangeText={setAmount}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Category (Food, Books, Rent...)"
+        placeholderTextColor="#9ca3af"
+        value={category}
+        onChangeText={setCategory}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Note (optional)"
+        placeholderTextColor="#9ca3af"
+        value={note}
+        onChangeText={setNote}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Date (YYYY-MM-DD)"
+        placeholderTextColor="#9ca3af"
+        value={date}
+        onChangeText={setDate}
+      />
 
-            <Button
-              title={editingId ? "Save Changes" : "Add Expense"}
-              onPress={editingId ? editExpense : addExpense}
-            />
-          </View>
+      <Button
+        title={editingId ? "Save Changes" : "Add Expense"}
+        onPress={editingId ? editExpense : addExpense}
+      />
+    </View>
 
-          {/* Filters */}
-          <View style={styles.filterRow}>
-            {["All", "This Week", "This Month"].map((f) => (
+    {/* Filters */}
+    <View style={styles.filterRow}>
+      {["All", "This Week", "This Month"].map((f) => (
+        <TouchableOpacity
+          key={f}
+          onPress={() => setFilter(f)}
+          style={[styles.filterButton, filter === f && styles.filterActive]}
+        >
+          <Text style={{ color: "#fff" }}>{f}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+
+    {/* Sort Dropdown */}
+    <View style={{ marginBottom: 12 }}>
+      <TouchableOpacity
+        style={styles.dropdownButton}
+        onPress={() => setDropdownVisible(true)}
+      >
+        <Text style={{ color: "#fff" }}>
+          Sort by: {sortField} ({sortDirection})
+        </Text>
+      </TouchableOpacity>
+
+      <Modal transparent visible={dropdownVisible} animationType="fade">
+        <TouchableOpacity
+          style={styles.dropdownOverlay}
+          onPress={() => setDropdownVisible(false)}
+        >
+          <View style={styles.dropdownMenu}>
+            {["date", "amount", "category"].map((field) => (
               <TouchableOpacity
-                key={f}
-                onPress={() => setFilter(f)}
-                style={[styles.filterButton, filter === f && styles.filterActive]}
+                key={field}
+                style={styles.dropdownOption}
+                onPress={() => {
+                  setSortField(field);
+                  setDropdownVisible(false);
+                }}
               >
-                <Text style={{ color: "#fff" }}>{f}</Text>
+                <Text style={styles.dropdownText}>{field}</Text>
+              </TouchableOpacity>
+            ))}
+
+            <View style={{ height: 1, backgroundColor: "#555", marginVertical: 8 }} />
+
+            {["ASC", "DESC"].map((dir) => (
+              <TouchableOpacity
+                key={dir}
+                style={styles.dropdownOption}
+                onPress={() => {
+                  setSortDirection(dir);
+                  setDropdownVisible(false);
+                }}
+              >
+                <Text style={styles.dropdownText}>{dir}</Text>
               </TouchableOpacity>
             ))}
           </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
 
-          {/* Sort Dropdown */}
-          <View style={{ marginBottom: 12 }}>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setDropdownVisible(true)}
-            >
-              <Text style={{ color: "#fff" }}>
-                Sort by: {sortField} ({sortDirection})
-              </Text>
-            </TouchableOpacity>
+    {/* EXPENSE LIST – Fixed */}
+    <FlatList
+      data={expenses}
+      keyExtractor={(item) => item.id.toString()}
+      renderItem={renderExpense}
+      ListEmptyComponent={<Text style={styles.empty}>No expenses yet.</Text>}
+      style={{ flex: 1 }}
+      contentContainerStyle={{ paddingBottom: 120, paddingTop: 12 }}
+    />
 
-            <Modal transparent visible={dropdownVisible} animationType="fade">
-              <TouchableOpacity
-                style={styles.dropdownOverlay}
-                onPress={() => setDropdownVisible(false)}
-              >
-                <View style={styles.dropdownMenu}>
-                  {["date", "amount", "category"].map((field) => (
-                    <TouchableOpacity
-                      key={field}
-                      style={styles.dropdownOption}
-                      onPress={() => {
-                        setSortField(field);
-                        setDropdownVisible(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownText}>{field}</Text>
-                    </TouchableOpacity>
-                  ))}
-
-                  <View style={{ height: 1, backgroundColor: "#555", marginVertical: 8 }} />
-
-                  {["ASC", "DESC"].map((dir) => (
-                    <TouchableOpacity
-                      key={dir}
-                      style={styles.dropdownOption}
-                      onPress={() => {
-                        setSortDirection(dir);
-                        setDropdownVisible(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownText}>{dir}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </TouchableOpacity>
-            </Modal>
-          </View>
-
-          <FlatList
-            data={expenses}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderExpense}
-            ListEmptyComponent={<Text style={styles.empty}>No expenses yet.</Text>}
-            style={{ marginBottom: 8 }}
-            contentContainerStyle={{ paddingBottom: 120 }}
-          />
-
-          {/* Running Total */}
-          <Text style={styles.totalDisplay}>
-            Total: ${runningTotal.toFixed(2)}
-          </Text>
-        </ScrollView>
+    {/* Running Total */}
+    <Text style={styles.totalDisplay}>
+      Total: ${runningTotal.toFixed(2)}
+    </Text>
+  </View>
       ) : (
         /* Charts Screen */
         <View style={{ flex: 1 }}>
